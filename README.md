@@ -4,16 +4,47 @@ A PC overlay for League of Legends' **ARAM Mayhem**. When the augment cards show
 
 Sibling of [Morellonomicon (黑魔禁書)](https://github.com/zelvet-velvet/Morellonomicon), the Traditional Chinese beginner guide whose augment tiers and reasoning it uses. The name is one of the items Morellonomicon builds from.
 
-**Status**: design done, code not started.
+**Status**: early. The overlay's look, the ranking and the app shell work; the app shows the play-style panel in champ select. Reading the augment cards from the screen comes next, so the verdicts under the cards show only in the browser samples for now.
 
 ## What it shows
 - **Play styles** on the left: pick one (Dr. Mundo: Q 消耗 · 穿透, 坦克, 坦克輸出) and the ranking follows it.
 - **The champion's special play** on top (Mundo: Q takes no AP, AD or health, so look for damage amps and penetration).
-- **Under each card**, a plate whose metal says how well it suits you (prismatic, gold, silver, dull iron), with a one-word verdict and why.
+- **Under each card**, a plate with the tier in the game's augment tile (S prismatic, A/B gold, C dim silver), a one-word verdict and why. The best card gets a line round it; the card worth rerolling gets corner marks on its reroll button.
 - **Hold Shift** over a card: the game's own detail, with the phrase that matters for your champion marked.
 
 ## How it works
-A separate always-on-top window (Tauri 2, about 40–80 MB of RAM). It reads your champion from the League client's local API and looks only at the three card areas of the screen when a pick is open. It never reads or changes the game's memory.
+A separate always-on-top window (Tauri 2, about 40–80 MB of RAM) that lets clicks through to the game except over its own controls. It reads your champion from the League client's local API (champ select) and the game's Live Client Data API, and will look only at the three card areas of the screen when a pick is open. It never reads or changes the game's memory.
+
+## Development
+The data comes from [Morellonomicon](https://github.com/zelvet-velvet/Morellonomicon), cloned next to this repo.
+
+```sh
+npm install
+npm run data      # src/data/game-data.json from ../Morellonomicon (tiers, reasons; no win rates)
+npm test          # the ranking
+npm run dev       # the overlay in a browser: http://localhost:1420/?sample=mundo (also kaisa, unknown)
+```
+
+In the browser, hold **Shift** over a card for the note; the play-style panel, the mode and 設定 work.
+
+### The app (Windows)
+Needs the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/): Microsoft C++ Build Tools (the "Desktop development with C++" workload), Rust and Node.js, for example:
+
+```powershell
+winget install Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+winget install Rustlang.Rustup
+winget install OpenJS.NodeJS.LTS
+```
+
+Then, in the repo (delete `node_modules` first if it was installed from WSL):
+
+```powershell
+npm install
+npm run tauri dev     # the overlay over the screen; quit from its tray icon
+npm run tauri build   # an installer in src-tauri/target/release/bundle/nsis
+```
+
+Run the game in borderless mode: an overlay cannot sit over exclusive fullscreen.
 
 ## Rules it keeps
 - No augment win rates (Riot's developer policy); tiers and reasons only.
