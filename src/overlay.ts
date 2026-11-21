@@ -35,7 +35,7 @@ function stylePanel(v: View): string {
   const X = 64, Y = 264, W = 360, H = 304;
   let s = box(X, Y, W, H, "plate") + plate(W, H)
     + `<div class="abs panel-title">玩法</div>`
-    + `<div class="abs label" style="left:28px;top:184px">取向</div>`
+    + `<div class="abs label" style="left:28px;top:184px">我要</div>`
     + `<div class="abs mode-line">${MODE_LINE[v.settings.mode]}</div>`
     + `<button class="abs btn" style="left:${W - 24 - 112}px;top:20px;width:112px;height:40px" data-act="open-settings" data-hit>${plate(112, 40)}<span>設定</span></button>`;
   const multi = (champ?.styles.length ?? 0) > 1;
@@ -45,7 +45,7 @@ function stylePanel(v: View): string {
     + `<span class="abs style-name">${esc(style?.name ?? "沒有資料")}</span>`
     + `<span class="abs style-sub">${multi ? "點此換玩法" : champ ? "這隻英雄只有一種玩法" : "等待選角"}</span>`
     + (multi ? `<span class="abs style-caret">▾</span>` : "") + `</button>`;
-  (["穩", "均衡", "貪"] as Mode[]).forEach((m, j) => {
+  (["貪", "均衡", "穩"] as Mode[]).forEach((m, j) => {
     const on = v.settings.mode === m;
     s += `<button class="abs chip${on ? " on" : ""}" style="left:${28 + j * 104}px;top:212px;width:96px;height:44px" data-act="mode" data-mode="${m}" data-hit>`
       + plate(96, 44, on ? TEAL : GOLD, on ? 0.9 : 0.65) + `<span>${m}</span></button>`;
