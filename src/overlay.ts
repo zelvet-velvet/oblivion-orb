@@ -36,23 +36,28 @@ export function verdicts(v: View): Verdict[] {
 // ---- left: 玩法 (the choice) ----
 function leftPanel(v: View, champ: ChampionData, span: Span): string {
   const style = styleOf(v.data, v.state.champion, v.settings.styleKey);
+  const styles = champ.styles.slice(0, 4), rows = Math.ceil(styles.length / 2);   // up to four builds, two per row
   const W = 320, P = 14, TH = 128, GAP = 10, X = span.left - 20 - W;
-  const H = 68 + TH + 10 + 20 + 16 + 26 + 40 + 20;
+  const tilesH = rows * TH + (rows - 1) * GAP;
+  const H = 68 + tilesH + 10 + 20 + 16 + 26 + 40 + 20;
   const Y = Math.max(344, Math.round((span.top + span.bottom) / 2 - H / 2));
-  const styles = champ.styles.slice(0, 2), tw = styles.length > 1 ? Math.floor((W - 2 * P - GAP) / 2) : W - 2 * P;
+  const half = Math.floor((W - 2 * P - GAP) / 2);
   let s = box(X, Y, W, H, "plate") + plate(W, H)
     + `<div class="abs panel-title" style="left:${P}px">玩法</div>`
     + `<button class="abs gear" style="left:${W - P - 36}px;top:16px" data-act="open-settings" data-hit aria-label="建議邏輯">${plate(36, 36)}${gear(22)}</button>`;
   styles.forEach((st, k) => {
     const on = st.key === style?.key, auto = on && v.settings.styleKey == null;
-    s += `<button class="abs tile${on ? " on" : ""}" style="left:${P + k * (tw + GAP)}px;top:68px;width:${tw}px;height:${TH}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
+    // a lone tile on its row (one style, or the third of three) spans the row
+    const tw = styles.length === 1 || (k === styles.length - 1 && k % 2 === 0) ? W - 2 * P : half;
+    const tx = P + (k % 2) * (half + GAP), ty = 68 + Math.floor(k / 2) * (TH + GAP);
+    s += `<button class="abs tile${on ? " on" : ""}" style="left:${tx}px;top:${ty}px;width:${tw}px;height:${TH}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
       + plate(tw, TH, on ? TEAL : GOLD, on ? 0.9 : 0.65)
       + (auto ? `<span class="auto">自動</span>` : "")
       + `<span class="role">${roleIcon(st.role, 40, on ? "#F0E6D2" : DIM)}</span>`
       + `<span class="tile-name">${esc(st.name)}</span>${dmgPill(st.damage)}</button>`;
   });
-  s += `<div class="abs auto-line" style="left:${P}px;top:${68 + TH + 10}px;width:${W - 2 * P}px">依你選的強化和裝備自動選，點一下可改</div>`;
-  const my = 68 + TH + 10 + 20 + 16, cw = Math.floor((W - 2 * P - 12) / 3);
+  s += `<div class="abs auto-line" style="left:${P}px;top:${68 + tilesH + 10}px;width:${W - 2 * P}px">依你選的強化和裝備自動選，點一下可改</div>`;
+  const my = 68 + tilesH + 10 + 20 + 16, cw = Math.floor((W - 2 * P - 12) / 3);
   s += `<div class="abs label" style="left:${P}px;top:${my}px">我要</div>`;
   (["貪", "均衡", "穩"] as Mode[]).forEach((m, j) => {
     const on = v.settings.mode === m;

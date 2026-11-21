@@ -52,11 +52,12 @@ def main():
         fm = frontmatter(p)
         if str(fm.get("id", "")).isdigit():
             augments[str(fm["id"])] = {"name": fm.get("name", ""), "rarity": fm.get("rarity", ""), "icon": fm.get("icon", "")}
-    item_names = {}
+    item_names, item_tags = {}, {}
     for p in (mn / "道具").glob("*.md"):
         fm = frontmatter(p)
         if str(fm.get("id", "")).isdigit():
             item_names[int(fm["id"])] = fm.get("name", "")
+            item_tags[int(fm["id"])] = fm.get("tags", []) or []
     builds = json.loads((mn / "_data" / "item-builds.json").read_text(encoding="utf-8")).get("champions", {})
     champ_notes = {}
     for p in (mn / "英雄").glob("*.md"):
@@ -101,28 +102,45 @@ def main():
         first_role = roles[0] if roles else ""
         ver = dd_version(note.get("icon", ""))
         b = (builds.get(cid) or {}).get("styles") or []
+        item = lambda i: {"id": i, "name": item_names.get(i, ""), "icon": f"https://ddragon.leagueoflegends.com/cdn/{ver}/img/item/{i}.png" if ver else ""}
+        tiers = {key: [[r["id"], r["tier"], r.get("reason", ""), r.get("when", "")] for r in st["tiers"] if r.get("tier") in TIERS]
+                 for key, st in styles.items()}   # each list already in the order Morellonomicon ranks them
 
-        def core_for(key):
-            """The build that matches the augment style: an AP style takes the build named for magic (法), an AD or on-hit
-            style one that is not; otherwise the first build. Its core items, then its first third item."""
-            if not b:
-                return []
-            magic = [s for s in b if "法" in s.get("name", "")]
-            other = [s for s in b if "法" not in s.get("name", "")]
-            pick = (magic or b)[0] if key == "ap" else (other or b)[0] if key in ("ad", "onhit") else b[0]
-            ids = ([c["id"] for c in pick.get("core", [])] + [c["id"] for c in pick.get("third", [])[:1]])[:3]
-            return [{"id": i, "name": item_names.get(i, ""), "icon": f"https://ddragon.leagueoflegends.com/cdn/{ver}/img/item/{i}.png" if ver else ""}
-                    for i in ids]
+        def build_damage(st):
+            n = st.get("name", "").replace("魔法彎刀", "")   # the item's name, not a damage type
+            if "AP" in n or "法" in n:
+                return "magic"
+            if "AD" in n or "暴擊" in n or "穿甲" in n:
+                return "phys"
+            tags = [t for c in st.get("core", []) for t in item_tags.get(c["id"], [])]
+            ap, ad = tags.count("SpellDamage"), tags.count("Damage")
+            return "magic" if ap > ad else "phys" if ad > ap else damage_of(note, "main")
+
+        def build_role(st, dmg):
+            n = st.get("name", "")
+            for words, role in ((("坦克輸出",), "fighter"), (("坦克",), "tank"), (("刺客",), "assassin"), (("射手",), "marksman"), (("輔助", "補師"), "support"),
+                                (("法師", "法術"), "mage"), (("戰士", "輸出", "斬殺", "連招", "消耗", "穿甲"), "fighter")):
+                if any(w in n for w in words):
+                    return role
+            if "特效" in n:
+                return "mage" if dmg == "magic" else "marksman"
+            return ROLE.get(first_role, "fighter")
+
         out_styles = []
-        for key, st in styles.items():
-            rows = [r for r in st["tiers"] if r.get("tier") in TIERS]   # already in the order Morellonomicon ranks them
-            role = "mage" if key == "ap" else ROLE.get(first_role, "fighter")
-            name = first_role if key == "main" and first_role else st.get("name", key)
-            out_styles.append({"key": key, "name": name, "role": role, "damage": damage_of(note, key), "core": core_for(key),
-                               "tiers": [[r["id"], r["tier"], r.get("reason", ""), r.get("when", "")] for r in rows]})
-        out_styles.sort(key=lambda s: s["key"] != "main")   # the main style first
+        if b:   # the play styles are the champion's builds; each ranks augments by the closest tier list
+            for k, st in enumerate(b[:4]):
+                dmg = build_damage(st)
+                tk = ("ap" if dmg == "magic" else "ad") if ("ap" if dmg == "magic" else "ad") in tiers else "main" if "main" in tiers else next(iter(tiers))
+                ids = ([c["id"] for c in st.get("core", [])] + [c["id"] for c in st.get("third", [])[:1]])[:3]
+                out_styles.append({"key": str(k), "name": st.get("name", ""), "role": build_role(st, dmg), "damage": dmg,
+                                   "core": [item(i) for i in ids], "tierKey": tk})
+        else:   # no builds: the tier lists are the styles
+            for key, st in styles.items():
+                out_styles.append({"key": key, "name": first_role if key == "main" and first_role else st.get("name", key),
+                                   "role": "mage" if key == "ap" else ROLE.get(first_role, "fighter"), "damage": damage_of(note, key),
+                                   "core": [], "tierKey": key})
         champions[cid] = {"key": note.get("key"), "name": note.get("name", cid), "icon": note.get("icon", ""), "styles": out_styles,
-                          "play": play_rows(note)}
+                          "tiers": tiers, "play": play_rows(note)}
 
     out = {"patch": data.get("patch", ""), "source": data.get("source", ""), "augments": augments, "champions": champions}
     OUT.parent.mkdir(parents=True, exist_ok=True)

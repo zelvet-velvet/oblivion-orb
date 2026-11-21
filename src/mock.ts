@@ -18,6 +18,9 @@ export const SAMPLES: Record<string, { state: GameState }> = {
   kaisa: {   // two play styles, to try the style tiles
     state: { phase: "augment-pick", champion: "Kaisa", round: "稜鏡", offers: sampleOffers([1015, 3078, 1134]), shift: false, hover: null },
   },
+  ahri: {   // four play styles
+    state: { phase: "augment-pick", champion: "Ahri", round: "金", offers: sampleOffers([1013, 1015, 3132]), shift: false, hover: null },
+  },
   unknown: {   // a card not read yet and a pick with no reroll left
     state: { phase: "augment-pick", champion: "DrMundo", round: "金",
       offers: sampleOffers([1353, null, 3071]).map((o) => ({ ...o, reroll: null })), shift: false, hover: null },

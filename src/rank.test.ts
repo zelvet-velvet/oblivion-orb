@@ -6,11 +6,16 @@ const data: GameData = {
   patch: "test", source: "test", augments: {},
   champions: {
     DrMundo: {
-      key: 36, name: "蒙多醫生", icon: "", styles: [
-        { key: "main", name: "主流", role: "tank", damage: "magic", core: [], tiers: [[1, "S", "技能增傷，Q 吃得到", ""], [2, "S", "第二個 S", ""], [3, "B", "疊生命，但 Q 沒加成", ""],
-          [4, "C", "Q 用不到", ""], [5, "C", "更不合", ""], [6, "A", "很合", ""]] },
-        { key: "tank", name: "坦克", role: "tank", damage: "magic", core: [], tiers: [[3, "S", "堆生命", ""], [1, "C", "坦克用不到", ""]] },
-      ], play: [],
+      key: 36, name: "蒙多醫生", icon: "", play: [],
+      styles: [
+        { key: "0", name: "坦克輸出", role: "fighter", damage: "magic", core: [], tierKey: "main" },
+        { key: "1", name: "坦克", role: "tank", damage: "magic", core: [], tierKey: "tank" },
+      ],
+      tiers: {
+        main: [[1, "S", "技能增傷，Q 吃得到", ""], [2, "S", "第二個 S", ""], [3, "B", "疊生命，但 Q 沒加成", ""],
+               [4, "C", "Q 用不到", ""], [5, "C", "更不合", ""], [6, "A", "很合", ""]],
+        tank: [[3, "S", "堆生命", ""], [1, "C", "坦克用不到", ""]],
+      },
     },
   },
 };
@@ -28,7 +33,7 @@ describe("rankOffers", () => {
   });
 
   it("follows the picked play style", () => {
-    const v = rankOffers(data, "DrMundo", { ...S, styleKey: "tank" }, [offer(3), offer(1), offer(4)]);
+    const v = rankOffers(data, "DrMundo", { ...S, styleKey: "1" }, [offer(3), offer(1), offer(4)]);
     expect(v.map((x) => x.tier)).toEqual(["S", "C", null]);
     expect(v[0].best).toBe(true);
     expect(v[1].reroll).toBe(true);

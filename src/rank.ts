@@ -40,7 +40,8 @@ export function rankOffers(
 ): Verdict[] {
   const style = styleOf(data, champion, settings.styleKey);
   const row = new Map<number, { tier: Tier; why: string; order: number }>();
-  style?.tiers.forEach(([id, tier, why], order) => row.set(id, { tier, why, order }));
+  const champ = champion ? data.champions[champion] : undefined;
+  (style && champ ? champ.tiers[style.tierKey] ?? [] : []).forEach(([id, tier, why], order) => row.set(id, { tier, why, order }));
 
   const out: Verdict[] = offers.map(({ id }) => {
     const r = id != null && settings.useTiers ? row.get(id) : undefined;
