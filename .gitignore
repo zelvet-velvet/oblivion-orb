@@ -13,3 +13,5 @@ Thumbs.db
 # local
 *.log
 .env
+# generated from Morellonomicon (npm run data)
+src/data/
