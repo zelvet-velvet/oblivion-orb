@@ -112,7 +112,9 @@ function settingsPanel(s: Settings): string {
     }
     y += 56;
   }
-  const H = y + 24;
+  // Riot's disclaimer (required in the app's about box)
+  body += `<div class="abs s-legal" style="top:${y + 12}px">遺忘寶珠 · Oblivion Orb isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</div>`;
+  const H = y + 12 + 72 + 20;
   return `<div class="abs veil-all" data-act="close-settings" data-hit></div>`
     + box(X, Y, W, H, "plate settings") + plate(W, H)
     + `<div class="abs s-title">建議邏輯</div><div class="abs s-sub">選強化時隨時可改，馬上重排；按 Esc 關閉</div>`

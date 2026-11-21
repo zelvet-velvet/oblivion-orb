@@ -1,7 +1,7 @@
 // Starts the overlay. In the app (Tauri) Rust sends "game-reading" (phase and champion) and "pointer" (Shift and the cursor),
 // and the window lets clicks through except over the overlay's own controls (their rects go to Rust as hit regions).
 // The augment cards are not read yet (screen capture is the next step), so in the app the overlay shows in champ select. In a browser it shows a sample
-// (?sample=mundo | kaisa | unknown) over a drawn game screen.
+// (?sample=mundo | kaisa | unknown, with &open=settings | list or &shift=<card>) over a drawn game screen.
 
 import dataJson from "./data/game-data.json";
 import { gameLayer, SAMPLES } from "./mock";
@@ -108,6 +108,11 @@ if (inApp) {
   bar.className = "mock-bar"; bar.textContent = `sample: ${name} · ${Object.keys(SAMPLES).map((k) => `?sample=${k}`).join(" ")} · patch ${data.patch}`;
   document.body.append(bar);
   state = structuredClone(sample.state);
+  // &open=settings | list opens a panel; &shift=0..2 holds Shift over that card (for screenshots)
+  const q = new URLSearchParams(location.search);
+  if (q.get("open") === "settings") ui.settingsOpen = true;
+  if (q.get("open") === "list") ui.listOpen = true;
+  if (q.get("shift") != null) state = { ...state, shift: true, hover: Number(q.get("shift")) };
   const setShift = (on: boolean) => { if (state.shift !== on) setState({ ...state, shift: on }); };
   addEventListener("keydown", (e) => { if (e.key === "Shift") setShift(true); });
   addEventListener("keyup", (e) => { if (e.key === "Shift") setShift(false); });
