@@ -54,14 +54,15 @@ button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .core span { font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .foot { font-size: 15px; font-weight: 700; color: var(--faint); }
 
-/* the nameplate on each card: letter, bar and words centred as one group */
+/* the nameplate on each card: fixed columns, the same on every card: the letter centred in the left 84 px, a bar, the words */
 .np > svg:first-child { position: absolute; left: 0; top: 0; }
-.np-group { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 14px; }
-.np-letter { font: 800 64px/1 Bahnschrift, "Segoe UI", sans-serif; width: 48px; text-align: center; }
-.np-bar { width: 2px; height: 50px; }
-.np-words { display: flex; flex-direction: column; gap: 2px; margin-left: 2px; }
+.np-group { position: absolute; inset: 0; }
+.np-letter { position: absolute; left: 12px; top: 0; bottom: 0; width: 84px; display: flex; align-items: center; justify-content: center;
+  font: 800 64px/1 Bahnschrift, "Segoe UI", sans-serif; padding-top: 4px; }
+.np-bar { position: absolute; left: 100px; top: 21px; width: 2px; height: 50px; }
+.np-words { position: absolute; left: 116px; right: 14px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
 .np-v { font-size: 28px; font-weight: 800; line-height: 34px; }
-.np-w { font-size: 16px; font-weight: 700; line-height: 22px; white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.np-w { font-size: 16px; font-weight: 700; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np.unrated { background: rgba(10, 13, 20, 0.85); outline: 1px solid #5B5A56; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .np-l { font-size: 24px; font-weight: 800; color: var(--dim); }
 .np-s { font-size: 15px; font-weight: 600; color: var(--faint); }
