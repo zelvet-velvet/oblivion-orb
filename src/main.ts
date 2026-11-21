@@ -1,10 +1,12 @@
-// Starts the overlay. In the app (Tauri) Rust sends "game-reading" (phase and champion) and "pointer" (Shift and the cursor),
+// Starts the overlay. In the app (Tauri) Rust sends "game-reading" (phase and champion), "pick" (the augment cards the
+// reader sees: their names and where they sit) and "pointer" (Shift and the cursor),
 // and the window lets clicks through except over the overlay's own controls (their rects go to Rust as hit regions).
 // The augment cards are not read yet (screen capture is the next step), so in the app the overlay shows in champ select. In a browser it shows a sample
 // (?sample=mundo | kaisa | unknown, with &open=settings | list or &shift=<card>) over a drawn game screen.
 
 import dataJson from "./data/game-data.json";
 import { gameLayer, SAMPLES } from "./mock";
+import { makeNameMatcher } from "./names";
 import { render, type Action, type UiState } from "./overlay";
 import { DEFAULT_SETTINGS, type GameData, type GameState, type Mode, type Rect, type Settings } from "./types";
 
@@ -76,7 +78,12 @@ function setState(next: GameState) {
 
 interface Reading { phase: "idle" | "champ-select" | "in-game"; champion: string | null; championKey: number | null }
 interface Pointer { shift: boolean; x: number; y: number }
+interface PickCard { name: string; card: Rect; reroll: Rect | null }
+interface Pick { open: boolean; cards: PickCard[] }
 const byKey = new Map(Object.entries(data.champions).map(([id, c]) => [c.key, id]));
+const matchName = makeNameMatcher(data.augments);
+/** A rect in the window's CSS pixels, into the 1920 × 1080 frame the overlay draws in. */
+const toFrame = (r: Rect): Rect => ({ x: (r.x - offX) / scale, y: (r.y - offY) / scale, w: r.w / scale, h: r.h / scale });
 
 if (inApp) {
   void (async () => {
@@ -85,6 +92,14 @@ if (inApp) {
       const champion = r.champion ?? (r.championKey != null ? byKey.get(r.championKey) ?? null : null);
       // the offers stay as they are until the card reader sends them
       setState({ ...state, phase: state.phase === "augment-pick" && r.phase === "in-game" ? state.phase : r.phase, champion });
+    });
+    await listen<Pick>("pick", ({ payload: p }) => {
+      if (!p.open) {
+        if (state.phase === "augment-pick") setState({ ...state, phase: "in-game", offers: [], hover: null });
+        return;
+      }
+      const offers = p.cards.map((c) => ({ id: matchName(c.name), card: toFrame(c.card), reroll: c.reroll ? toFrame(c.reroll) : null }));
+      setState({ ...state, phase: "augment-pick", offers });
     });
     await listen<Pointer>("pointer", ({ payload: p }) => {
       const x = (p.x - offX) / scale, y = (p.y - offY) / scale;

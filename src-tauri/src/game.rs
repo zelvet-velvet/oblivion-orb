@@ -110,13 +110,15 @@ fn read(agent: &ureq::Agent) -> Reading {
     Reading { phase: "idle", ..Default::default() }
 }
 
-pub fn spawn(app: AppHandle) {
+/// `in_game` is set while the game's Live Client Data API answers: the card reader looks at the screen only then.
+pub fn spawn(app: AppHandle, in_game: Arc<std::sync::atomic::AtomicBool>) {
     thread::spawn(move || {
         let agent = agent();
         let mut last: Option<Reading> = None;
         let mut sent = Instant::now();
         loop {
             let now = read(&agent);
+            in_game.store(now.phase == "in-game", std::sync::atomic::Ordering::Relaxed);
             if last.as_ref() != Some(&now) || sent.elapsed() > Duration::from_secs(5) {
                 let _ = app.emit("game-reading", now.clone());
                 last = Some(now);

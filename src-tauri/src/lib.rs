@@ -4,6 +4,7 @@
 
 mod game;
 mod pointer;
+mod reader;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -34,8 +35,11 @@ pub fn run() {
             }
             tray.build(app)?;
 
+            reader::exclude_from_capture(app.handle());
+            let in_game = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             pointer::spawn(app.handle().clone());
-            game::spawn(app.handle().clone());
+            game::spawn(app.handle().clone(), in_game.clone());
+            reader::spawn(app.handle().clone(), in_game);
             Ok(())
         })
         .run(tauri::generate_context!())
