@@ -19,7 +19,7 @@ const box = (x: number, y: number, w: number, h: number, extra = "", attrs = "")
 
 export function verdicts(v: View): Verdict[] {
   return rankOffers(v.data, v.state.champion, v.settings,
-    v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null })), v.state.round);
+    v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null })));
 }
 
 function hintBar(h: ChampionHint): string {
@@ -94,7 +94,7 @@ function shiftNote(v: View, i: number, vd: Verdict): string {
 function settingsPanel(s: Settings): string {
   const W = 640, X = 960 - W / 2, Y = 196;
   const rows: [string, keyof Settings | null, "toggle" | "seg" | null][] = [
-    ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"], ["重骰留到稜鏡輪", "saveRerollForPrismatic", "toggle"],
+    ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
     ["可重骰門檻", null, null], ["rerollBelow", "rerollBelow", "seg"],
     ["顯示", null, null], ["英雄特殊玩法提示", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"]];
   let y = 96, body = "";

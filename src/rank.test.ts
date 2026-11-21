@@ -52,11 +52,8 @@ describe("rankOffers", () => {
     expect(v[1].reroll).toBe(true);
   });
 
-  it("never marks a reroll when the button is gone, or when saving it for the prismatic round", () => {
+  it("never marks a reroll when the button is gone", () => {
     expect(rankOffers(data, "DrMundo", S, [offer(1), offer(4, false)]).some((x) => x.reroll)).toBe(false);
-    const saving = { ...S, saveRerollForPrismatic: true };
-    expect(rankOffers(data, "DrMundo", saving, [offer(1), offer(4)], "金").some((x) => x.reroll)).toBe(false);
-    expect(rankOffers(data, "DrMundo", saving, [offer(1), offer(4)], "稜鏡")[1].reroll).toBe(true);
   });
 
   it("respects the reroll threshold", () => {

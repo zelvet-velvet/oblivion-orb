@@ -1,7 +1,7 @@
 // Ranks the offered augments for the champion and play style. Tiers, verdicts and reasons only: no win rates exist here
 // (tools/build_data.py keeps none). It marks the best card and, at most, one card worth rerolling; the player decides.
 
-import type { GameData, Rarity, Settings, StyleData, Tier } from "./types";
+import type { GameData, Settings, StyleData, Tier } from "./types";
 
 export const TIER_ORDER: Tier[] = ["S", "A", "B", "C"];
 export const VERDICT: Record<Tier, string> = { S: "最合", A: "很合", B: "還行", C: "不合" };
@@ -25,12 +25,12 @@ const rankOf = (t: Tier) => TIER_ORDER.indexOf(t);
 
 /**
  * One verdict per offer. Best: the highest tier, ties broken by Morellonomicon's order; none when nothing is above C.
- * Reroll: the weakest card below `settings.rerollBelow`, only when its reroll button is there and the reroll is not
- * being saved for the prismatic round.
+ * Reroll: the weakest card below `settings.rerollBelow`, only when its reroll button is there. A reroll left unused is
+ * lost at the end of the round, so there is no reason to keep one.
  */
 export function rankOffers(
   data: GameData, champion: string | null, settings: Settings,
-  offers: { id: number | null; canReroll: boolean }[], round: Rarity | null = null,
+  offers: { id: number | null; canReroll: boolean }[],
 ): Verdict[] {
   const style = styleOf(data, champion, settings.styleKey);
   const row = new Map<number, { tier: Tier; why: string; order: number }>();
@@ -54,11 +54,8 @@ export function rankOffers(
   const top = sorted[0];
   if (out[top].tier !== "C") out[top].best = true;
 
-  const saving = settings.saveRerollForPrismatic && round !== null && round !== "稜鏡";
-  if (!saving) {
-    const below = (t: Tier) => rankOf(t) > rankOf(settings.rerollBelow);
-    const worst = [...sorted].reverse().find((i) => offers[i].canReroll && below(out[i].tier!) && !out[i].best);
-    if (worst !== undefined) out[worst].reroll = true;
-  }
+  const below = (t: Tier) => rankOf(t) > rankOf(settings.rerollBelow);
+  const worst = [...sorted].reverse().find((i) => offers[i].canReroll && below(out[i].tier!) && !out[i].best);
+  if (worst !== undefined) out[worst].reroll = true;
   return out;
 }

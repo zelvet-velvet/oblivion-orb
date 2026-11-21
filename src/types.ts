@@ -29,14 +29,13 @@ export interface Settings {
   mode: Mode;
   useTiers: boolean;          // 英雄的強化分級
   useSynergy: boolean;        // 和已拿強化搭配 (no data yet)
-  saveRerollForPrismatic: boolean;
   rerollBelow: Tier;          // tiers below this one may be marked for a reroll
   showHint: boolean;          // 英雄特殊玩法提示
   onlyOnShift: boolean;       // the verdicts show only while Shift is held
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  styleKey: null, mode: "均衡", useTiers: true, useSynergy: true, saveRerollForPrismatic: false,
+  styleKey: null, mode: "均衡", useTiers: true, useSynergy: true,
   rerollBelow: "B", showHint: true, onlyOnShift: false,
 };
 
