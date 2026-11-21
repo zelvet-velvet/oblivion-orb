@@ -1,5 +1,6 @@
-// Starts the overlay. In the app (Tauri) the game state comes from Rust as "game-state" events, and the window lets clicks
-// through except over the overlay's own controls (their rects go to Rust as hit regions). In a browser it shows a sample
+// Starts the overlay. In the app (Tauri) Rust sends "game-reading" (phase and champion) and "pointer" (Shift and the cursor),
+// and the window lets clicks through except over the overlay's own controls (their rects go to Rust as hit regions).
+// The augment cards are not read yet (screen capture is the next step), so in the app the overlay shows in champ select. In a browser it shows a sample
 // (?sample=mundo | kaisa | unknown) over a drawn game screen.
 
 import dataJson from "./data/game-data.json";
@@ -75,10 +76,24 @@ function setState(next: GameState) {
   state = next; draw();
 }
 
+interface Reading { phase: "idle" | "champ-select" | "in-game"; champion: string | null; championKey: number | null }
+interface Pointer { shift: boolean; x: number; y: number }
+const byKey = new Map(Object.entries(data.champions).map(([id, c]) => [c.key, id]));
+
 if (inApp) {
   void (async () => {
     const { listen } = await import("@tauri-apps/api/event");
-    await listen<GameState>("game-state", (e) => setState(e.payload));
+    await listen<Reading>("game-reading", ({ payload: r }) => {
+      const champion = r.champion ?? (r.championKey != null ? byKey.get(r.championKey) ?? null : null);
+      // the offers stay as they are until the card reader sends them
+      setState({ ...state, phase: state.phase === "augment-pick" && r.phase === "in-game" ? state.phase : r.phase, champion });
+    });
+    await listen<Pointer>("pointer", ({ payload: p }) => {
+      const x = (p.x - offX) / scale, y = (p.y - offY) / scale;
+      const i = state.offers.findIndex((o) => x >= o.card.x && x <= o.card.x + o.card.w && y >= o.card.y && y <= o.card.y + o.card.h);
+      const hover = p.shift && i >= 0 ? i : null;
+      if (p.shift !== state.shift || hover !== state.hover) setState({ ...state, shift: p.shift, hover });
+    });
   })();
 } else {
   // the browser: a sample over a drawn game screen; Shift and the cursor as in the app

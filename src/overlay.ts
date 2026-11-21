@@ -124,7 +124,8 @@ export function render(root: HTMLElement, v: View): void {
   const showPick = st.phase === "augment-pick" && st.offers.length > 0;
   let html = "";
   if (v.settings.showHint && v.hint && st.champion) html += hintBar(v.hint);
-  if (st.champion && (showPick || st.phase === "champ-select" || st.phase === "in-game")) html += stylePanel(v);
+  // the play style is set in champ select and shown again at each pick; never over live play
+  if (st.champion && (showPick || st.phase === "champ-select")) html += stylePanel(v);
   if (showPick) {
     const vds = verdicts(v);
     const showVerdicts = !v.settings.onlyOnShift || st.shift;
