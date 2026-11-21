@@ -1,94 +1,125 @@
 // Draws the overlay from the game state, the data and the settings, in the 1920 × 1080 frame the screens were drawn in
-// (oblivion-orb-folio Spec/Screens.md: 主畫面, 玩法選單, Shift 重點, 邏輯設定). Everything is redrawn on each change; it is small.
+// (oblivion-orb-folio Spec/Screens.md: 主畫面, 懸停, Shift 重點, 邏輯設定). Everything anchors to the cards' positions, so
+// whatever the reader finds, the marks follow. Everything is redrawn on each change; it is small.
 
-import { bestFrame, brackets, plate, tile, toggle, TEAL, VERDICT_INK, WHY_INK, GOLD } from "./art";
-import { rankOffers, styleOf, type Verdict } from "./rank";
-import type { ChampionHint, GameData, GameState, Mode, Settings, Tier } from "./types";
+import {
+  DIM, EMBER_TXT, METAL, VERDICT_INK, WHY_INK, TEAL, GOLD,
+  gear, hextechFrame, plate, plateGlow, rarityPlate, rerollTag, richApAd, roleIcon, dmgPill, tile, toggle,
+} from "./art";
+import { rankOffers, shortWhy, styleOf, type Verdict } from "./rank";
+import type { ChampionData, CoreItem, GameData, GameState, Mode, Offer, Settings, Tier } from "./types";
 
-export interface UiState { listOpen: boolean; settingsOpen: boolean }
-export interface View { data: GameData; state: GameState; settings: Settings; hint: ChampionHint | null; ui: UiState }
+export interface UiState { settingsOpen: boolean }
+export interface View { data: GameData; state: GameState; settings: Settings; ui: UiState }
 export type Action =
-  | { type: "toggle-list" } | { type: "pick-style"; key: string } | { type: "mode"; mode: Mode }
+  | { type: "pick-style"; key: string } | { type: "mode"; mode: Mode }
   | { type: "open-settings" } | { type: "close-settings" } | { type: "setting"; key: keyof Settings; value: unknown };
 
-const DIM = "#A09B8C";
-const MODE_LINE: Record<Mode, string> = { 穩: "穩：先拿馬上有效的", 均衡: "均衡：穩的和上限高的各半", 貪: "貪：上限高、要慢慢疊的往前" };
+const MODE_LINE: Record<Mode, string> = { 貪: "貪：上限高、要慢慢疊的往前", 均衡: "均衡：穩的和上限高的各半", 穩: "穩：先拿馬上有效的" };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const box = (x: number, y: number, w: number, h: number, extra = "", attrs = "") =>
-  `<div class="abs ${extra}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px" ${attrs}>`;
+const box = (x: number, y: number, w: number, h: number, cls = "", attrs = "") =>
+  `<div class="abs ${cls}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px" ${attrs}>`;
+
+/** Where the cards are: the default pick layout when the reader has not sent any (champ select). */
+const DEFAULT_CARDS = { left: 433, right: 1489, top: 193, bottom: 719 };
+type Span = typeof DEFAULT_CARDS;
+function cardSpan(offers: Offer[]): Span {
+  if (!offers.length) return DEFAULT_CARDS;
+  return { left: Math.min(...offers.map((o) => o.card.x)), right: Math.max(...offers.map((o) => o.card.x + o.card.w)),
+           top: Math.min(...offers.map((o) => o.card.y)), bottom: Math.max(...offers.map((o) => o.card.y + o.card.h)) };
+}
 
 export function verdicts(v: View): Verdict[] {
-  return rankOffers(v.data, v.state.champion, v.settings,
-    v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null })));
+  return rankOffers(v.data, v.state.champion, v.settings, v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null })));
 }
 
-function hintBar(h: ChampionHint): string {
-  const W = 680, H = 96;
-  return box(960 - W / 2, 56, W, H, "plate") + plate(W, H)
-    + `<img class="abs hint-ic" src="${esc(h.icon)}" alt="">`
-    + `<div class="abs hint-line">${esc(h.line)}</div><div class="abs hint-look">${esc(h.look)}</div></div>`;
-}
-
-function stylePanel(v: View): string {
-  const champ = v.state.champion ? v.data.champions[v.state.champion] : undefined;
+// ---- left: 玩法 (the choice) ----
+function leftPanel(v: View, champ: ChampionData, span: Span): string {
   const style = styleOf(v.data, v.state.champion, v.settings.styleKey);
-  const X = 64, Y = 264, W = 360, H = 304;
+  const W = 320, P = 14, TH = 128, GAP = 10, X = span.left - 20 - W;
+  const H = 68 + TH + 10 + 20 + 16 + 26 + 40 + 20;
+  const Y = Math.max(344, Math.round((span.top + span.bottom) / 2 - H / 2));
+  const styles = champ.styles.slice(0, 2), tw = styles.length > 1 ? Math.floor((W - 2 * P - GAP) / 2) : W - 2 * P;
   let s = box(X, Y, W, H, "plate") + plate(W, H)
-    + `<div class="abs panel-title">玩法</div>`
-    + `<div class="abs label" style="left:28px;top:184px">我要</div>`
-    + `<div class="abs mode-line">${MODE_LINE[v.settings.mode]}</div>`
-    + `<button class="abs btn" style="left:${W - 24 - 112}px;top:20px;width:112px;height:40px" data-act="open-settings" data-hit>${plate(112, 40)}<span>設定</span></button>`;
-  const multi = (champ?.styles.length ?? 0) > 1;
-  s += `<button class="abs style-row" style="left:16px;top:76px;width:328px;height:88px" ${multi ? 'data-act="toggle-list" data-hit' : "disabled"}>`
-    + plate(328, 88, TEAL, 0.9)
-    + (champ?.icon ? `<img class="abs style-ic" src="${esc(champ.icon)}" alt="">` : "")
-    + `<span class="abs style-name">${esc(style?.name ?? "沒有資料")}</span>`
-    + `<span class="abs style-sub">${multi ? "點此換玩法" : champ ? "這隻英雄只有一種玩法" : "等待選角"}</span>`
-    + (multi ? `<span class="abs style-caret">▾</span>` : "") + `</button>`;
+    + `<div class="abs panel-title" style="left:${P}px">玩法</div>`
+    + `<button class="abs gear" style="left:${W - P - 36}px;top:16px" data-act="open-settings" data-hit aria-label="建議邏輯">${plate(36, 36)}${gear(22)}</button>`;
+  styles.forEach((st, k) => {
+    const on = st.key === style?.key, auto = on && v.settings.styleKey == null;
+    s += `<button class="abs tile${on ? " on" : ""}" style="left:${P + k * (tw + GAP)}px;top:68px;width:${tw}px;height:${TH}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
+      + plate(tw, TH, on ? TEAL : GOLD, on ? 0.9 : 0.65)
+      + (auto ? `<span class="auto">自動</span>` : "")
+      + `<span class="role">${roleIcon(st.role, 40, on ? "#F0E6D2" : DIM)}</span>`
+      + `<span class="tile-name">${esc(st.name)}</span>${dmgPill(st.damage)}</button>`;
+  });
+  s += `<div class="abs auto-line" style="left:${P}px;top:${68 + TH + 10}px;width:${W - 2 * P}px">依你選的強化和裝備自動選，點一下可改</div>`;
+  const my = 68 + TH + 10 + 20 + 16, cw = Math.floor((W - 2 * P - 12) / 3);
+  s += `<div class="abs label" style="left:${P}px;top:${my}px">我要</div>`;
   (["貪", "均衡", "穩"] as Mode[]).forEach((m, j) => {
     const on = v.settings.mode === m;
-    s += `<button class="abs chip${on ? " on" : ""}" style="left:${28 + j * 104}px;top:212px;width:96px;height:44px" data-act="mode" data-mode="${m}" data-hit>`
-      + plate(96, 44, on ? TEAL : GOLD, on ? 0.9 : 0.65) + `<span>${m}</span></button>`;
+    s += `<button class="abs chip${on ? " on" : ""}" style="left:${P + j * (cw + 6)}px;top:${my + 26}px;width:${cw}px;height:40px" data-act="mode" data-mode="${m}" data-hit title="${MODE_LINE[m]}">`
+      + plate(cw, 40, on ? TEAL : GOLD, on ? 0.9 : 0.65) + `<span>${m}</span></button>`;
   });
-  s += `</div>`;
-  if (v.ui.listOpen && champ) {
-    const LY = Y + 76 + 88 + 8, RH = 80;
-    s += box(X + 16, LY, 328, champ.styles.length * RH + 16, "list");
-    champ.styles.forEach((st, k) => {
-      const on = st.key === style?.key;
-      s += `<button class="abs list-row${on ? " on" : ""}" style="left:8px;top:${8 + k * RH}px;width:312px;height:${RH}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
-        + `<span class="list-name">${esc(st.name)}</span>${on ? `<span class="list-tick">✓</span>` : ""}</button>`;
+  return s + `</div>`;
+}
+
+// ---- right: the champion (the knowledge) ----
+function rightPanel(champ: ChampionData, core: CoreItem[], span: Span): string {
+  const W = 360, P = 24, X = span.right + 23;
+  const playH = champ.play.length ? champ.play.length * 56 + (champ.play.length - 1) * 14 : 0;
+  const H = 78 + (champ.play.length ? 30 + playH + 28 : 0) + (core.length ? 30 + 88 + 24 : 0) + 22 + 22;
+  const Y = Math.round((span.top + span.bottom) / 2 - H / 2);
+  let s = box(X, Y, W, H, "plate") + plate(W, H) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
+  let y = 78;
+  if (champ.play.length) {
+    s += `<div class="abs label" style="left:${P}px;top:${y}px">怎麼玩</div>`; y += 30;
+    champ.play.forEach((r, k) => {
+      s += `<div class="abs play" style="left:${P}px;top:${y}px;width:${W - 2 * P}px">`
+        + (r.icon ? `<span class="play-ic"><img src="${esc(r.icon)}" alt=""><b>${esc(r.key)}</b></span>` : `<span class="play-ic key">${esc(r.key)}</span>`)
+        + `<span class="play-t">${esc(r.title)}</span><span class="play-d">${richApAd(r.detail)}</span></div>`;
+      y += 56 + (k < champ.play.length - 1 ? 14 : 0);
     });
-    s += `</div>`;
+    s += `<div class="abs rule" style="left:${P}px;top:${y + 14}px;width:${W - 2 * P}px"></div>`;
+    y += 28;
   }
-  return s;
+  if (core.length) {
+    s += `<div class="abs label" style="left:${P}px;top:${y}px">核心裝</div>`; y += 30;
+    const cw = Math.floor((W - 2 * P) / core.length);
+    core.forEach((it, k) => {
+      s += `<div class="abs core" style="left:${P + k * cw}px;top:${y}px;width:${cw}px">`
+        + (it.icon ? `<img src="${esc(it.icon)}" alt="">` : "") + `<span>${esc(it.name)}</span></div>`;
+    });
+    y += 88 + 24;
+  }
+  s += `<div class="abs foot" style="left:${P}px;top:${y}px">按住 Shift 看重點</div>`;
+  return s + `</div>`;
 }
 
-function verdictPlate(x: number, y: number, w: number, v: Verdict): string {
-  const H = 92;
-  if (v.tier == null)
-    return box(x, y, w, H, "plate verdict") + plate(w, H, "#7E868E", 0.4)
-      + `<div class="verdict-group"><div class="words"><div class="v-label" style="color:${DIM}">${v.label}</div><div class="v-why" style="color:#7F878E">${esc(v.why)}</div></div></div></div>`;
-  const t = v.tier as Tier;
-  return box(x, y, w, H, "plate verdict") + plate(w, H, tileLine(t), t === "C" ? 0.55 : 0.9)
-    + `<div class="verdict-group">${tile(t, 56)}<div class="words">`
-    + `<div class="v-label" style="color:${VERDICT_INK[t]}">${v.label}</div>`
-    + `<div class="v-why" style="color:${v.reroll ? "#FFB27A" : WHY_INK[t]}">${esc(v.why)}</div>`
-    + `</div></div></div>`;
+// ---- on the cards ----
+function nameplate(o: Offer, vd: Verdict): string {
+  // in the card's empty lower part, under the game's longest text (y 597 of a 526-tall card from 193)
+  const PW = o.card.w - 60, PH = 92, X = o.card.x + 30, Y = o.card.y + Math.round(o.card.h * 0.768);
+  if (vd.tier == null)
+    return box(X, Y, PW, PH, "np unrated") + `<div class="np-l">${vd.label}</div><div class="np-s">${esc(vd.why)}</div></div>`;
+  const t = vd.tier as Tier, M = METAL[t];
+  const why = shortWhy(vd.why);   // the reroll is said by the tag under its button
+  return box(X - 22, Y - 22, PW + 44, PH + 44, "deco") + plateGlow(t, PW, PH) + `</div>`
+    + box(X, Y, PW, PH, "np") + rarityPlate(t, PW, PH)
+    + `<div class="np-group"><span class="np-letter" style="color:${M.ink}">${t}</span><span class="np-bar" style="background:${M.ink}"></span>`
+    + `<span class="np-words"><span class="np-v" style="color:${VERDICT_INK[t]}">${vd.label}</span>`
+    + `<span class="np-w" style="color:${vd.reroll ? EMBER_TXT : WHY_INK[t]}">${esc(why)}</span></span></div></div>`;
 }
-const tileLine = (t: Tier) => ({ S: "#D9C2FF", A: "#F7D688", B: "#E2BC6C", C: "#7E868E" })[t];
 
-function shiftNote(v: View, i: number, vd: Verdict): string {
-  const o = v.state.offers[i], W = 400, H = 184;
-  const x = o.card.x + o.card.w + 24, y = o.card.y + 216;
+/** Over the cards, the band the game's tooltip never reaches: the hovered card's verdict and its full why. */
+function banner(v: View, vd: Verdict): string {
   const champ = v.state.champion ? v.data.champions[v.state.champion] : undefined;
-  if (vd.tier == null) return "";
-  const t = vd.tier;
-  return box(x, y, W, H, "plate note") + plate(W, H, tileLine(t), 0.9)
-    + `<div class="abs" style="left:20px;top:20px">${tile(t, 52)}</div>`
-    + `<div class="abs note-title" style="color:${VERDICT_INK[t]}">${vd.label}${champ ? `，對${esc(champ.name)}` : ""}</div>`
-    + `<div class="abs note-why" style="color:${WHY_INK[t]}">${esc(vd.why)}</div>`
-    + `<div class="abs note-close">放開 Shift 收起</div></div>`;
+  const a = vd.id != null ? v.data.augments[String(vd.id)] : undefined;
+  const W = 760, H = 132, X = 960 - W / 2, Y = 34, t = vd.tier, tx = t ? 100 : 28;
+  const head = `${a?.name ?? "這張卡"} · ${vd.label}${champ ? `，對${champ.name}` : ""}`;
+  return box(X, Y, W, H, "plate banner") + plate(W, H, t ? METAL[t].ink : DIM, 0.8)
+    + (t ? `<div class="abs" style="left:24px;top:36px">${tile(t, 58)}</div>` : "")
+    + `<div class="abs b-head" style="left:${tx}px;color:${t ? VERDICT_INK[t] : DIM}">${esc(head)}</div>`
+    + `<div class="abs b-why" style="left:${tx}px;color:${t ? WHY_INK[t] : DIM}">${richApAd(vd.why)}</div>`
+    + `<div class="abs b-foot">${v.state.shift ? "放開 Shift 收起" : "按住 Shift 看它吃什麼數值"}</div></div>`;
 }
 
 function settingsPanel(s: Settings): string {
@@ -96,14 +127,14 @@ function settingsPanel(s: Settings): string {
   const rows: [string, keyof Settings | null, "toggle" | "seg" | null][] = [
     ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
     ["可重骰門檻", null, null], ["rerollBelow", "rerollBelow", "seg"],
-    ["顯示", null, null], ["英雄特殊玩法提示", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"]];
+    ["顯示", null, null], ["怎麼玩、核心裝", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"]];
   let y = 96, body = "";
   for (const [label, key, kind] of rows) {
     if (!kind) { body += `<div class="abs s-head" style="top:${y + 8}px">${label}</div>`; y += 36; continue; }
     if (kind === "seg") {
-      const below = s.rerollBelow, worse = (["S", "A", "B", "C"] as Tier[]).slice((["S", "A", "B", "C"] as Tier[]).indexOf(below) + 1);
+      const all: Tier[] = ["S", "A", "B", "C"], below = s.rerollBelow, worse = all.slice(all.indexOf(below) + 1);
       body += `<div class="abs s-row" style="top:${y}px"><span>${worse.length ? `${worse.join("、")} 級標成可重骰` : "不標可重骰"}</span><div class="seg">`;
-      for (const t of ["S", "A", "B", "C"] as Tier[])
+      for (const t of all)
         body += `<button class="seg-b${t === below ? " on" : ""}" data-act="setting" data-key="rerollBelow" data-value="${t}" data-hit>${plate(54, 40, t === below ? TEAL : GOLD, t === below ? 0.9 : 0.65)}<span>${t}</span></button>`;
       body += `</div></div>`;
     } else {
@@ -112,41 +143,40 @@ function settingsPanel(s: Settings): string {
     }
     y += 56;
   }
-  // Riot's disclaimer (required in the app's about box)
   body += `<div class="abs s-legal" style="top:${y + 12}px">遺忘寶珠 · Oblivion Orb isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</div>`;
   const H = y + 12 + 72 + 20;
   return `<div class="abs veil-all" data-act="close-settings" data-hit></div>`
     + box(X, Y, W, H, "plate settings") + plate(W, H)
     + `<div class="abs s-title">建議邏輯</div><div class="abs s-sub">選強化時隨時可改，馬上重排；按 Esc 關閉</div>`
-    + `<button class="abs s-close" data-act="close-settings" data-hit>✕</button>` + body + `</div>`;
+    + `<button class="abs s-close" data-act="close-settings" data-hit aria-label="關閉">✕</button>` + body + `</div>`;
 }
 
 export function render(root: HTMLElement, v: View): void {
   const st = v.state;
-  const showPick = st.phase === "augment-pick" && st.offers.length > 0;
+  const champ = st.champion ? v.data.champions[st.champion] : undefined;
+  const pick = st.phase === "augment-pick" && st.offers.length > 0;
+  const span = cardSpan(pick ? st.offers : []);
   let html = "";
-  if (v.settings.showHint && v.hint && st.champion) html += hintBar(v.hint);
-  // the play style is set in champ select and shown again at each pick; never over live play
-  if (st.champion && (showPick || st.phase === "champ-select")) html += stylePanel(v);
-  if (showPick) {
+  // the panels: in champ select and at each pick, never over live play
+  if (champ && (pick || st.phase === "champ-select")) {
+    html += leftPanel(v, champ, span);
+    if (v.settings.showHint) html += rightPanel(champ, styleOf(v.data, st.champion, v.settings.styleKey)?.core ?? [], span);
+  }
+  if (pick) {
     const vds = verdicts(v);
-    const showVerdicts = !v.settings.onlyOnShift || st.shift;
-    let bottom = 0;
+    const showPlates = !v.settings.onlyOnShift || st.shift;
     st.offers.forEach((o, i) => {
       const vd = vds[i];
-      if (vd.best) html += box(o.card.x - 24, o.card.y - 24, o.card.w + 48, o.card.h + 48, "deco") + bestFrame(o.card.w, o.card.h) + `</div>`;
-      if (vd.reroll && o.reroll) {
-        html += box(o.card.x, o.card.y, o.card.w, o.card.h, "veil") + `</div>`;
-        html += box(o.reroll.x - 24, o.reroll.y - 24, o.reroll.w + 48, o.reroll.h + 48, "deco") + brackets(o.reroll.w, o.reroll.h) + `</div>`;
+      if (vd.best) html += box(o.card.x - 34, o.card.y - 34, o.card.w + 68, o.card.h + 68, "deco") + hextechFrame(o.card.w, o.card.h) + `</div>`;
+      if (showPlates) html += nameplate(o, vd);
+      // the tag hangs where the game's tooltip opens, so it hides while a card is hovered
+      if (vd.reroll && o.reroll && st.hover == null) {
+        const tw = 156, th = 42, x = o.reroll.x + o.reroll.w / 2 - tw / 2, y = o.reroll.y + o.reroll.h + 4;
+        html += box(x, y, tw, th, "deco tag") + rerollTag(tw, th) + `<span>↻ 建議重骰</span></div>`;
       }
-      const y = (o.reroll ? o.reroll.y + o.reroll.h : o.card.y + o.card.h + 72) + 16;
-      if (showVerdicts) html += verdictPlate(o.card.x, y, o.card.w, vd);
-      bottom = Math.max(bottom, y + 92);
     });
-    if (!st.shift) html += `<div class="abs shift-hint" style="top:${bottom + 28}px">按住 Shift 看重點</div>`;
-    if (st.shift && st.hover != null && vds[st.hover]) html += shiftNote(v, st.hover, vds[st.hover]);
+    if (st.hover != null && vds[st.hover]) html += banner(v, vds[st.hover]);
   }
   if (v.ui.settingsOpen) html += settingsPanel(v.settings);
   root.innerHTML = html;
 }
-

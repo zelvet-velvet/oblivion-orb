@@ -1,5 +1,5 @@
 // Click-through: the window ignores the mouse except over the rects the page reports (its buttons and panels).
-// Also tells the page when Shift is held and where the cursor is meanwhile, for the Shift note.
+// Also tells the page where the cursor is (the hovered card) and when Shift is held (the scaling banner).
 
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -68,11 +68,12 @@ pub fn spawn(app: AppHandle) {
             }
             let k = win.scale_factor().unwrap_or(1.0);
             let shift = shift_held();
-            // while Shift is up only its release matters; while it is down the cursor too (the hovered card)
+            // the game opens its tooltip on plain hover, so the page follows the cursor all the time (a few pixels of
+            // movement at most 30 times a second) and Shift for the scaling banner
             let now = Pointer { shift, x: (x / k).round(), y: (y / k).round() };
             let changed = match &last {
                 None => true,
-                Some(l) => l.shift != now.shift || (shift && (l.x != now.x || l.y != now.y)),
+                Some(l) => l.shift != now.shift || (l.x - now.x).abs() >= 3.0 || (l.y - now.y).abs() >= 3.0,
             };
             if changed {
                 let _ = app.emit("pointer", now.clone());

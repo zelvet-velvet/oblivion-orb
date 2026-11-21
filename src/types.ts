@@ -30,7 +30,7 @@ export interface Settings {
   useTiers: boolean;          // 英雄的強化分級
   useSynergy: boolean;        // 和已拿強化搭配 (no data yet)
   rerollBelow: Tier;          // tiers below this one may be marked for a reroll
-  showHint: boolean;          // 英雄特殊玩法提示
+  showHint: boolean;          // 怎麼玩、核心裝 (the right panel)
   onlyOnShift: boolean;       // the verdicts show only while Shift is held
 }
 
@@ -43,14 +43,16 @@ export const DEFAULT_SETTINGS: Settings = {
 export interface AugmentInfo { name: string; rarity: Rarity | string; icon: string }
 /** [augment id, tier, reason, when], in the order Morellonomicon ranks them for the style */
 export type TierRow = [number, Tier, string, string];
-export interface StyleData { key: string; name: string; tiers: TierRow[] }
-export interface ChampionData { key: number | null; name: string; icon: string; styles: StyleData[] }
+export type Role = "tank" | "fighter" | "mage" | "marksman" | "assassin" | "support";
+export type Damage = "phys" | "magic";
+export interface StyleData { key: string; name: string; role: Role; damage: Damage; core: CoreItem[]; tiers: TierRow[] }
+/** 怎麼玩: one core ability, from the champion note's one-line play summary */
+export interface PlayRow { key: string; title: string; detail: string; icon: string }
+export interface CoreItem { id: number; name: string; icon: string }
+export interface ChampionData { key: number | null; name: string; icon: string; styles: StyleData[]; play: PlayRow[] }
 export interface GameData {
   patch: string;
   source: string;
   augments: Record<string, AugmentInfo>;
   champions: Record<string, ChampionData>;
 }
-
-/** The champion's special play, shown on top. Not in Morellonomicon's data yet; samples only. */
-export interface ChampionHint { icon: string; line: string; look: string }

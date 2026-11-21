@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rankOffers } from "./rank";
+import { rankOffers, shortWhy } from "./rank";
 import { DEFAULT_SETTINGS, type GameData } from "./types";
 
 const data: GameData = {
@@ -7,10 +7,10 @@ const data: GameData = {
   champions: {
     DrMundo: {
       key: 36, name: "蒙多醫生", icon: "", styles: [
-        { key: "main", name: "主流", tiers: [[1, "S", "技能增傷，Q 吃得到", ""], [2, "S", "第二個 S", ""], [3, "B", "疊生命，但 Q 沒加成", ""],
+        { key: "main", name: "主流", role: "tank", damage: "magic", core: [], tiers: [[1, "S", "技能增傷，Q 吃得到", ""], [2, "S", "第二個 S", ""], [3, "B", "疊生命，但 Q 沒加成", ""],
           [4, "C", "Q 用不到", ""], [5, "C", "更不合", ""], [6, "A", "很合", ""]] },
-        { key: "tank", name: "坦克", tiers: [[3, "S", "堆生命", ""], [1, "C", "坦克用不到", ""]] },
-      ],
+        { key: "tank", name: "坦克", role: "tank", damage: "magic", core: [], tiers: [[3, "S", "堆生命", ""], [1, "C", "坦克用不到", ""]] },
+      ], play: [],
     },
   },
 };
@@ -68,5 +68,15 @@ describe("rankOffers", () => {
     expect(v[0]).toMatchObject({ tier: null, label: "未辨識", best: false, reroll: false });
     const u = rankOffers(data, "Nobody", S, [offer(1)]);
     expect(u[0]).toMatchObject({ tier: null, label: "未評分" });
+  });
+});
+
+describe("shortWhy", () => {
+  it("keeps the first phrase, cut to fit the plate", () => {
+    expect(shortWhy("肉更肉，傷害少一點")).toBe("肉更肉");
+    expect(shortWhy("技能接普攻，技能後普攻加攻速、傷害")).toBe("技能接普攻");
+    expect(shortWhy("有短冷卻技能，技能傷害、急速大增")).toBe("有短冷卻技能");
+    expect(shortWhy("全能吸血全能吸血全能吸血")).toBe("全能吸血全能吸血");
+    expect(shortWhy("Q 打到就回血")).toBe("Q 打到就回血");
   });
 });

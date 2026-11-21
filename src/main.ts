@@ -6,7 +6,7 @@
 import dataJson from "./data/game-data.json";
 import { gameLayer, SAMPLES } from "./mock";
 import { render, type Action, type UiState } from "./overlay";
-import { DEFAULT_SETTINGS, type ChampionHint, type GameData, type GameState, type Mode, type Rect, type Settings } from "./types";
+import { DEFAULT_SETTINGS, type GameData, type GameState, type Mode, type Rect, type Settings } from "./types";
 
 const data = dataJson as unknown as GameData;
 const inApp = "__TAURI_INTERNALS__" in window;
@@ -19,9 +19,8 @@ function loadSettings(): Settings {
 function saveSettings() { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch { /* private mode: settings last the session */ } }
 
 let settings = loadSettings();
-const ui: UiState = { listOpen: false, settingsOpen: false };
+const ui: UiState = { settingsOpen: false };
 let state: GameState = { phase: "idle", champion: null, round: null, offers: [], shift: false, hover: null };
-let hint: ChampionHint | null = null;
 let scale = 1, offX = 0, offY = 0;
 
 function fit() {
@@ -31,7 +30,7 @@ function fit() {
 }
 
 function draw() {
-  render(stage, { data, state, settings, hint, ui });
+  render(stage, { data, state, settings, ui });
   if (inApp) void sendHitRegions();
 }
 
@@ -47,10 +46,9 @@ async function sendHitRegions() {
 
 function act(a: Action) {
   switch (a.type) {
-    case "toggle-list": ui.listOpen = !ui.listOpen; break;
-    case "pick-style": settings = { ...settings, styleKey: a.key }; ui.listOpen = false; break;
+    case "pick-style": settings = { ...settings, styleKey: a.key }; break;
     case "mode": settings = { ...settings, mode: a.mode }; break;
-    case "open-settings": ui.settingsOpen = true; ui.listOpen = false; break;
+    case "open-settings": ui.settingsOpen = true; break;
     case "close-settings": ui.settingsOpen = false; break;
     case "setting": settings = { ...settings, [a.key]: a.value }; break;
   }
@@ -68,11 +66,11 @@ stage.addEventListener("click", (e) => {
     act({ type: "setting", key: el.dataset.key as keyof Settings, value: raw === "true" ? true : raw === "false" ? false : raw });
   } else act({ type: t } as Action);
 });
-addEventListener("keydown", (e) => { if (e.key === "Escape" && (ui.settingsOpen || ui.listOpen)) { ui.settingsOpen = ui.listOpen = false; draw(); } });
+addEventListener("keydown", (e) => { if (e.key === "Escape" && ui.settingsOpen) { ui.settingsOpen = false; draw(); } });
 addEventListener("resize", () => { fit(); draw(); });
 
 function setState(next: GameState) {
-  if (next.champion !== state.champion) { settings = { ...settings, styleKey: null }; ui.listOpen = false; }
+  if (next.champion !== state.champion) settings = { ...settings, styleKey: null };
   state = next; draw();
 }
 
@@ -91,7 +89,7 @@ if (inApp) {
     await listen<Pointer>("pointer", ({ payload: p }) => {
       const x = (p.x - offX) / scale, y = (p.y - offY) / scale;
       const i = state.offers.findIndex((o) => x >= o.card.x && x <= o.card.x + o.card.w && y >= o.card.y && y <= o.card.y + o.card.h);
-      const hover = p.shift && i >= 0 ? i : null;
+      const hover = i >= 0 ? i : null;   // the game opens its tooltip on plain hover, so we follow it too
       if (p.shift !== state.shift || hover !== state.hover) setState({ ...state, shift: p.shift, hover });
     });
   })();
@@ -100,7 +98,6 @@ if (inApp) {
   document.body.classList.add("browser");
   const name = new URLSearchParams(location.search).get("sample") ?? "mundo";
   const sample = SAMPLES[name] ?? SAMPLES.mundo;
-  hint = sample.hint;
   const game = document.createElement("div");
   game.id = "game"; game.innerHTML = gameLayer(data, sample.state);
   document.body.insertBefore(game, stage);
@@ -111,7 +108,6 @@ if (inApp) {
   // &open=settings | list opens a panel; &shift=0..2 holds Shift over that card (for screenshots)
   const q = new URLSearchParams(location.search);
   if (q.get("open") === "settings") ui.settingsOpen = true;
-  if (q.get("open") === "list") ui.listOpen = true;
   if (q.get("shift") != null) state = { ...state, shift: true, hover: Number(q.get("shift")) };
   const setShift = (on: boolean) => { if (state.shift !== on) setState({ ...state, shift: on }); };
   addEventListener("keydown", (e) => { if (e.key === "Shift") setShift(true); });

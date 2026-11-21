@@ -23,6 +23,12 @@ export function styleOf(data: GameData, champion: string | null, key: string | n
 
 const rankOf = (t: Tier) => TIER_ORDER.indexOf(t);
 
+/** A reason short enough for the card's plate: its first phrase, at most `max` characters. The full reason stays for hover. */
+export function shortWhy(why: string, max = 8): string {
+  const first = why.split(/[，,；;：:。]/)[0].trim();
+  return [...first].length <= max ? first : [...first].slice(0, max).join("");
+}
+
 /**
  * One verdict per offer. Best: the highest tier, ties broken by Morellonomicon's order; none when nothing is above C.
  * Reroll: the weakest card below `settings.rerollBelow`, only when its reroll button is there. A reroll left unused is
