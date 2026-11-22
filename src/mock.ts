@@ -18,6 +18,9 @@ export const SAMPLES: Record<string, { state: GameState }> = {
   kaisa: {   // two play styles, to try the style tiles
     state: { phase: "augment-pick", champion: "Kaisa", round: "稜鏡", offers: sampleOffers([1015, 3078, 1134]), shift: false, hover: null },
   },
+  jax: {   // seven play styles, AD 戰士 to a rare AP 刺客
+    state: { phase: "augment-pick", champion: "Jax", round: "金", offers: sampleOffers([1013, 1015, 3132]), shift: false, hover: null },
+  },
   ahri: {   // four play styles
     state: { phase: "augment-pick", champion: "Ahri", round: "金", offers: sampleOffers([1013, 1015, 3132]), shift: false, hover: null },
   },

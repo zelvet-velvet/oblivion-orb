@@ -8,8 +8,7 @@ import {
 } from "./art";
 import { endDraw, FADE, FLIP, imageOk, loaded, motion } from "./motion";
 import { rankOffers, shortWhy, styleOf, type Verdict } from "./rank";
-import { groupStyles, groupWarn } from "./styles";
-import type { ChampionData, CoreItem, GameData, GameState, Mode, Offer, Settings, StyleData, Tier } from "./types";
+import type { ChampionData, CoreItem, GameData, GameState, LateItem, Mode, Offer, Settings, StyleData, Tier } from "./types";
 
 export interface UiState {
   settingsOpen: boolean; test?: boolean; fullscreen?: boolean;
@@ -77,17 +76,14 @@ const dragHandle = (key: "left" | "right", w: number) =>
   `<div class="abs drag" style="left:0;top:0;width:${w}px;height:60px" data-drag="${key}" data-hit title="拖曳移動，按兩下回到原位"></div>`;
 
 // ---- left: 玩法 (the choice) ----
-// Two levels: the role and damage (AP 刺客, AD 戰士) as tiles, the choice that moves the augment ranking; under it that group's
-// builds, rare and losing ones marked. The chosen build's items are on the right.
-const BUILD_H = 38, BUILD_GAP = 6;
+// One tile per play style, a role and damage (AP 刺客, AD 戰士, 坦克): the choice that moves the augment ranking and the build on
+// the right. Most played first, each with how many play it; rare and losing ones marked.
 function leftPanel(v: View, champ: ChampionData, span: Span): string {
   const style = styleOf(v.data, v.state.champion, v.settings.styleKey);
-  const groups = groupStyles(champ.styles), group = groups.find((g) => style && g.styles.includes(style)) ?? groups[0];
+  const styles = champ.styles;
   const W = 320, P = 14, TH = 64, GAP = 8, inner = W - 2 * P, half = Math.floor((inner - GAP) / 2);
-  const tileRows = Math.ceil(groups.length / 2), tilesH = tileRows * TH + (tileRows - 1) * GAP;
-  const builds = group?.styles ?? [], cols = builds.length > 4 ? 2 : 1, buildRows = Math.ceil(builds.length / cols);
-  const buildsY = 68 + tilesH + 16 + 28, buildsH = buildRows * BUILD_H + Math.max(0, buildRows - 1) * BUILD_GAP;
-  const autoY = buildsY + buildsH + 10, modeY = autoY + 20 + 16;
+  const tileRows = Math.ceil(styles.length / 2), tilesH = tileRows * TH + (tileRows - 1) * GAP;
+  const autoY = 68 + tilesH + 12, modeY = autoY + 20 + 16;
   const H = modeY + 26 + 40 + 20;
   const [k, fit] = fitIn(span.left - 28, W, v.settings.panelScale), X = Math.round(span.left - 16 - W * k);
   const [dx, dy] = v.settings.panelOffsets.left ?? [0, 0];
@@ -95,28 +91,17 @@ function leftPanel(v: View, champ: ChampionData, span: Span): string {
   let s = box(X + dx, Y, W, H, "plate", "", fit + ";" + motion("left", "fade", FADE)) + plate(W, H) + dragHandle("left", W - P - 36 - 8)
     + `<div class="abs panel-title" style="left:${P}px">玩法</div>`
     + `<button class="abs gear" style="left:${W - P - 36}px;top:16px" data-act="open-settings" data-hit aria-label="建議邏輯">${plate(36, 36)}${gear(22)}</button>`;
-  groups.forEach((g, i) => {
-    const on = g === group;
-    // a lone tile on its row (one group, or the last of an odd number) spans the row
-    const tw = groups.length === 1 || (i === groups.length - 1 && i % 2 === 0) ? inner : half;
+  styles.forEach((st, i) => {
+    const on = st === style, auto = on && v.settings.styleKey == null;
+    // a lone tile on its row (one style, or the last of an odd number) spans the row
+    const tw = styles.length === 1 || (i === styles.length - 1 && i % 2 === 0) ? inner : half;
     const tx = P + (i % 2) * (half + GAP), ty = 68 + Math.floor(i / 2) * (TH + GAP);
-    // a tap picks the group's most played build
-    s += `<button class="abs group${on ? " on" : ""}" style="left:${tx}px;top:${ty}px;width:${tw}px;height:${TH}px" data-act="pick-style" data-key="${esc(g.styles[0].key)}" data-hit>`
+    const share = st.share ? `${Math.max(1, Math.round(st.share * 100))}% 玩家` : "";
+    s += `<button class="abs group${on ? " on" : ""}" style="left:${tx}px;top:${ty}px;width:${tw}px;height:${TH}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
       + plate(tw, TH, on ? TEAL : GOLD, on ? 0.9 : 0.65)
-      + `<span class="role">${roleIcon(g.role, 30, on ? "#F0E6D2" : DIM)}</span>`
-      + `<span class="group-words"><span class="group-name">${esc(g.label)}</span><span class="group-n">${g.styles.length} 種出裝${warnTag(groupWarn(g))}</span></span></button>`;
+      + `<span class="role">${roleIcon(st.role, 30, on ? "#F0E6D2" : DIM)}</span>`
+      + `<span class="group-words"><span class="group-name">${esc(st.name)}</span><span class="group-n">${auto ? "自動 · " : ""}${share}${warnTag(st.warn)}</span></span></button>`;
   });
-  if (group) {
-    s += `<div class="abs label" style="left:${P}px;top:${68 + tilesH + 16}px">${esc(group.label)}的出裝</div>`;
-    const bw = cols === 2 ? half : inner;
-    builds.forEach((st, i) => {
-      const on = st === style, auto = on && v.settings.styleKey == null;
-      const bx = P + (i % cols) * (half + GAP), by = buildsY + Math.floor(i / cols) * (BUILD_H + BUILD_GAP);   // row by row
-      s += `<button class="abs build${on ? " on" : ""}" style="left:${bx}px;top:${by}px;width:${bw}px;height:${BUILD_H}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
-        + plate(bw, BUILD_H, on ? TEAL : GOLD, on ? 0.9 : 0.4)
-        + `<span class="build-name">${esc(st.name)}</span>${auto ? `<span class="auto">自動</span>` : ""}${warnTag(st.warn)}</button>`;
-    });
-  }
   s += `<div class="abs auto-line" style="left:${P}px;top:${autoY}px;width:${inner}px">依你選的強化和裝備自動選，點一下可改</div>`;
   const cw = Math.floor((inner - 12) / 3);
   s += `<div class="abs label" style="left:${P}px;top:${modeY}px">我要</div>`;
@@ -129,18 +114,21 @@ function leftPanel(v: View, champ: ChampionData, span: Span): string {
 }
 
 // ---- right: the champion (the knowledge) ----
-/** The chosen build's path, a row each: the core in order, the third item (one of), the boots, the late items. */
-function pathRows(st: StyleData | null): [string, CoreItem[]][] {
+/** The chosen build's path, a row each: the three core items in order, the boots, items four to six (by need, two rows of
+ * three at most). A row of items four to six shows each one's need under its name. */
+function pathRows(st: StyleData | null): [string, (CoreItem | LateItem)[]][] {
   if (!st) return [];
-  const rows: [string, CoreItem[]][] = [["核心", st.core], ["第三件", st.third ?? []], ["鞋子", st.boots ? [st.boots] : []], ["後期", st.late ?? []]];
+  const late = st.late ?? [];
+  const rows: [string, (CoreItem | LateItem)[]][] = [["核心", st.core], ["鞋子", st.boots ? [st.boots] : []], ["4–6 件", late.slice(0, 3)], ["", late.slice(3, 6)]];
   return rows.filter(([, items]) => items.length);
 }
-const PATH_H = 66, PATH_GAP = 8;
+const PATH_H = 66, PATH_TALL = 84, PATH_GAP = 8;
 function rightPanel(champ: ChampionData, style: StyleData | null, span: Span, offset: [number, number] = [0, 0], size = 1): string {
   const W = 360, P = 24;
   const [k, fit] = fitIn(1920 - 12 - span.right - 16, W, size), X = span.right + 16;
   const playH = champ.play.length ? champ.play.length * 56 + (champ.play.length - 1) * 14 : 0;
-  const path = pathRows(style), pathH = path.length ? path.length * PATH_H + (path.length - 1) * PATH_GAP : 0;
+  const path = pathRows(style);
+  const pathH = path.reduce((h, [, items]) => h + (items.some((it) => "need" in it) ? PATH_TALL : PATH_H), 0) + Math.max(0, path.length - 1) * PATH_GAP;
   const H = 78 + (champ.play.length ? 30 + playH + 28 : 0) + (path.length ? 30 + pathH + 20 : 0) + 22 + 22;
   const Y = Math.max(12, Math.round((span.top + span.bottom) / 2 - H * k / 2)) + offset[1];
   let s = box(X + offset[0], Y, W, H, "plate", "", fit + ";" + motion("right", "fade", FADE)) + plate(W, H) + dragHandle("right", W) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
@@ -160,12 +148,15 @@ function rightPanel(champ: ChampionData, style: StyleData | null, span: Span, of
     s += `<div class="abs label" style="left:${P}px;top:${y}px">出裝・${esc(style.name)}${warnTag(style.warn).replace('class="warn"', 'class="warn inline"')}</div>`; y += 30;
     const LW = 56, cw = Math.floor((W - 2 * P - LW) / 3);
     path.forEach(([label, items], r) => {
-      s += `<div class="abs path-label" style="left:${P}px;top:${y}px;height:${PATH_H}px">${label}${label === "第三件" && items.length > 1 ? "<i>擇一</i>" : ""}</div>`;
+      const tall = items.some((it) => "need" in it);   // items four to six: a line for what each adds
+      s += `<div class="abs path-label" style="left:${P}px;top:${y}px;height:${PATH_H}px">${label}${label === "4–6 件" ? "<i>依需要挑</i>" : ""}</div>`;
       items.slice(0, 3).forEach((it, j) => {
-        s += `<div class="abs core" style="left:${P + LW + j * cw}px;top:${y}px;width:${cw}px" title="${esc(it.name)}">`
-          + (it.icon && imageOk(it.icon) ? `<img src="${esc(it.icon)}" alt="">` : `<i class="core-empty"></i>`) + `<span>${esc(it.name)}</span></div>`;
+        const why = "need" in it ? (it.when || it.need || "") : "";
+        s += `<div class="abs core" style="left:${P + LW + j * cw}px;top:${y}px;width:${cw}px" title="${esc(it.name + (why ? `：${why}` : ""))}">`
+          + (it.icon && imageOk(it.icon) ? `<img src="${esc(it.icon)}" alt="">` : `<i class="core-empty"></i>`) + `<span>${esc(it.name)}</span>`
+          + (tall ? `<small class="need">${esc(why)}</small>` : "") + `</div>`;
       });
-      y += PATH_H + (r < path.length - 1 ? PATH_GAP : 0);
+      y += (tall ? PATH_TALL : PATH_H) + (r < path.length - 1 ? PATH_GAP : 0);
     });
     y += 20;
   }
@@ -255,7 +246,7 @@ export function render(root: HTMLElement, v: View): void {
   // the champion's icons load first (from champ select on); until they are in, nothing of the champion shows, so the
   // panels never appear empty and fill in icon by icon
   const ready = !champ || loaded([...champ.play.map((r) => r.icon),
-    ...champ.styles.flatMap((s) => [...s.core, ...(s.third ?? []), ...(s.late ?? []), ...(s.boots ? [s.boots] : [])].map((c) => c.icon))], v.redraw);
+    ...champ.styles.flatMap((s) => [...s.core, ...(s.late ?? []), ...(s.boots ? [s.boots] : [])].map((c) => c.icon))], v.redraw);
   if (champ && ready && inGame) html += toggleButton(open, v.settings.panelOffsets.toggle);
   // the panels: in champ select; in game at each pick, in the shop, or when the toggle opened them
   if (champ && ready && open) {

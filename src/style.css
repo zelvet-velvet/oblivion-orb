@@ -49,6 +49,7 @@ button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .rule { height: 1px; background: rgba(200, 170, 110, 0.18); }
 .core { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .core img { width: 44px; height: 44px; border-radius: 4px; }
+.core .need { margin-top: -4px; font-size: 12px; font-weight: 700; color: var(--faint); white-space: nowrap; }
 .core span { max-width: 100%; font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .foot { font-size: 15px; font-weight: 700; color: var(--faint); }
 
@@ -120,18 +121,12 @@ button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .warn.inline { position: static; margin-left: 8px; letter-spacing: 0; }
 /* 玩法: the role and damage tiles, then the group's builds */
 .group { display: flex; align-items: center; gap: 10px; padding: 0 12px; text-align: left; }
-.group > svg:first-child, .build > svg:first-child { position: absolute; left: 0; top: 0; }
+.group > svg:first-child { position: absolute; left: 0; top: 0; }
 .group .role { position: relative; height: 30px; }
 .group-words { position: relative; display: flex; flex-direction: column; }
 .group-name { font-size: 17px; font-weight: 800; color: var(--dim); line-height: 22px; white-space: nowrap; }
 .group.on .group-name { color: var(--ink); }
 .group-n { font-size: 12px; font-weight: 700; color: var(--faint); line-height: 16px; white-space: nowrap; }
 .group-n .warn { position: static; margin-left: 6px; }
-.build { display: flex; align-items: center; gap: 6px; padding: 0 10px; text-align: left; }
-.build-name { position: relative; font-size: 15px; font-weight: 800; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.build:hover .build-name, .build.on .build-name { color: var(--ink); }
-.build .auto { position: relative; left: auto; top: auto; flex: none; }
-.build .warn { position: relative; right: auto; top: auto; margin-left: auto; flex: none; font-size: 13px; }
-/* 出裝: the chosen build's path */
 .path-label { display: flex; flex-direction: column; justify-content: center; font-size: 14px; font-weight: 800; color: var(--dim); line-height: 18px; }
 .path-label i { font-style: normal; font-size: 12px; font-weight: 700; color: var(--faint); }
