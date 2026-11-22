@@ -9,7 +9,7 @@ import {
 import { rankOffers, shortWhy, styleOf, type Verdict } from "./rank";
 import type { ChampionData, CoreItem, GameData, GameState, Mode, Offer, Settings, Tier } from "./types";
 
-export interface UiState { settingsOpen: boolean; test?: boolean }
+export interface UiState { settingsOpen: boolean; test?: boolean; fullscreen?: boolean }
 export interface View { data: GameData; state: GameState; settings: Settings; ui: UiState }
 export type Action =
   | { type: "pick-style"; key: string } | { type: "mode"; mode: Mode }
@@ -190,6 +190,8 @@ export function render(root: HTMLElement, v: View): void {
     if (st.hover != null && vds[st.hover]) html += banner(v, vds[st.hover]);
   }
   if (v.ui.settingsOpen) html += settingsPanel(v.settings);
+  if (v.ui.fullscreen && st.phase === "champ-select")
+    html += `<div class="abs fullscreen-warn"><b>遊戲是全螢幕模式</b>遺忘寶珠在遊戲裡會看不到強化卡。請在遊戲裡到 設定 › 影像 › 視窗模式，改成「無邊框」。</div>`;
   if (v.ui.test) html += `<div class="abs test-badge">測試模式 · 從系統匣關閉</div>`;
   root.innerHTML = html;
 }

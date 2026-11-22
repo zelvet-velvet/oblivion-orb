@@ -90,7 +90,7 @@ function setState(next: GameState) {
   state = next; draw();
 }
 
-interface Reading { phase: "idle" | "champ-select" | "in-game"; champion: string | null; championKey: number | null; test: boolean }
+interface Reading { phase: "idle" | "champ-select" | "in-game"; champion: string | null; championKey: number | null; test: boolean; fullscreen: boolean }
 interface Pointer { shift: boolean; x: number; y: number }
 interface PickCard { name: string; card: Rect; reroll: Rect | null }
 interface Pick { open: boolean; cards: PickCard[] }
@@ -108,6 +108,7 @@ if (inApp) {
       if (champion) localStorage.setItem(LAST_CHAMP, champion);
       else if (r.test) champion = localStorage.getItem(LAST_CHAMP) ?? "DrMundo";
       ui.test = r.test;
+      ui.fullscreen = r.fullscreen;
       // the offers stay as they are until the card reader sends them
       setState({ ...state, phase: state.phase === "augment-pick" && r.phase === "in-game" ? state.phase : r.phase, champion });
     });

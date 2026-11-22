@@ -24,6 +24,9 @@ pub struct Reading {
     champion_key: Option<i64>,
     /// the tray's test mode is on: "in-game" with the last champion seen, so a screenshot of a pick can be read
     test: bool,
+    /// the game is set to exclusive fullscreen (game.cfg WindowMode=0): the overlay can neither show over it nor read the
+    /// cards, so the page asks for borderless in champ select
+    fullscreen: bool,
 }
 
 fn agent() -> ureq::Agent {
@@ -51,6 +54,13 @@ fn lockfile_paths() -> Vec<PathBuf> {
         v.push(PathBuf::from(format!("{drive}:\\Riot Games\\League of Legends\\lockfile")));
     }
     v
+}
+
+/// The game's window mode from its settings file (Config\game.cfg next to the lockfile): 0 fullscreen, 1 windowed,
+/// 2 borderless. A file the game writes when its settings change, not the game's memory.
+fn window_mode() -> Option<u8> {
+    let text = lockfile_paths().into_iter().find_map(|p| fs::read_to_string(p.parent()?.join("Config").join("game.cfg")).ok())?;
+    text.lines().find_map(|l| l.trim().strip_prefix("WindowMode=")?.trim().parse().ok())
 }
 
 fn client() -> Option<Client> {
@@ -121,8 +131,22 @@ pub fn spawn(app: AppHandle, in_game: Arc<std::sync::atomic::AtomicBool>, diag: 
         let mut last: Option<Reading> = None;
         let mut sent = Instant::now();
         let mut seen = Reading::default(); // the last champion read, for the test mode
+        let mut mode: Option<u8> = None;
         loop {
             let mut now = read(&agent);
+            if now.phase == "champ-select" || mode.is_none() {
+                let m = window_mode();
+                if m != mode {
+                    diag.log(&format!("game window mode: {}", match m {
+                        Some(0) => "fullscreen (the overlay cannot show or read the cards: set it to borderless)",
+                        Some(1) => "windowed",
+                        Some(2) => "borderless",
+                        _ => "unknown (no game.cfg found)",
+                    }));
+                    mode = m.or(Some(255));
+                }
+            }
+            now.fullscreen = mode == Some(0);
             let idle = now.phase == "idle";
             in_game.store(now.phase == "in-game", std::sync::atomic::Ordering::Relaxed);
             if now.champion.is_some() || now.champion_key.is_some() {

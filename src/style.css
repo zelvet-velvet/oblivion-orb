@@ -99,3 +99,7 @@ button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
 /* the tray's test mode is on (the card reader runs without a game) */
 .test-badge { left: 16px; top: 12px; padding: 4px 10px; font-size: 15px; color: #F0E6D2; background: rgba(120, 30, 20, 0.85); border: 1px solid #C8AA6E; border-radius: 3px; }
+
+/* champ select, when the game is set to exclusive fullscreen: the overlay will not work in game */
+.fullscreen-warn { left: 560px; top: 40px; width: 800px; padding: 14px 20px; font-size: 18px; line-height: 1.5; color: #F0E6D2; background: rgba(110, 28, 18, 0.92); border: 1px solid #C8AA6E; border-radius: 4px; text-align: center; }
+.fullscreen-warn b { display: block; font-size: 22px; color: #F5D07A; margin-bottom: 4px; }
