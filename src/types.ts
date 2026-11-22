@@ -32,11 +32,13 @@ export interface Settings {
   rerollBelow: Tier;          // tiers below this one may be marked for a reroll
   showHint: boolean;          // 怎麼玩、核心裝 (the right panel)
   onlyOnShift: boolean;       // the verdicts show only while Shift is held
+  /** where the player dragged the side panels: [dx, dy] from their place beside the cards, in 1920 × 1080 pixels */
+  panelOffsets: { left?: [number, number]; right?: [number, number] };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   styleKey: null, mode: "均衡", useTiers: true, useSynergy: true,
-  rerollBelow: "B", showHint: true, onlyOnShift: false,
+  rerollBelow: "B", showHint: true, onlyOnShift: false, panelOffsets: {},
 };
 
 // ---- the data built by tools/build_data.py from Morellonomicon ----

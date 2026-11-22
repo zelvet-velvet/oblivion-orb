@@ -38,6 +38,10 @@ export function verdicts(v: View): Verdict[] {
   return rankOffers(v.data, v.state.champion, v.settings, v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null })));
 }
 
+/** The panel's title row: drag it to move the panel, double-click it to put the panel back beside the cards. */
+const dragHandle = (key: "left" | "right", w: number) =>
+  `<div class="abs drag" style="left:0;top:0;width:${w}px;height:60px" data-drag="${key}" data-hit title="拖曳移動，按兩下回到原位"></div>`;
+
 // ---- left: 玩法 (the choice) ----
 function leftPanel(v: View, champ: ChampionData, span: Span): string {
   const style = styleOf(v.data, v.state.champion, v.settings.styleKey);
@@ -46,9 +50,10 @@ function leftPanel(v: View, champ: ChampionData, span: Span): string {
   const [k, fit] = fitIn(span.left - 28, W), X = Math.round(span.left - 16 - W * k);
   const tilesH = rows * TH + (rows - 1) * GAP;
   const H = 68 + tilesH + 10 + 20 + 16 + 26 + 40 + 20;
-  const Y = Math.max(k < 1 ? 200 : 344, Math.round((span.top + span.bottom) / 2 - H * k / 2));
+  const [dx, dy] = v.settings.panelOffsets.left ?? [0, 0];
+  const Y = Math.max(k < 1 ? 200 : 344, Math.round((span.top + span.bottom) / 2 - H * k / 2)) + dy;
   const half = Math.floor((W - 2 * P - GAP) / 2);
-  let s = box(X, Y, W, H, "plate", "", fit) + plate(W, H)
+  let s = box(X + dx, Y, W, H, "plate", "", fit) + plate(W, H) + dragHandle("left", W - P - 36 - 8)
     + `<div class="abs panel-title" style="left:${P}px">玩法</div>`
     + `<button class="abs gear" style="left:${W - P - 36}px;top:16px" data-act="open-settings" data-hit aria-label="建議邏輯">${plate(36, 36)}${gear(22)}</button>`;
   styles.forEach((st, k) => {
@@ -74,13 +79,13 @@ function leftPanel(v: View, champ: ChampionData, span: Span): string {
 }
 
 // ---- right: the champion (the knowledge) ----
-function rightPanel(champ: ChampionData, core: CoreItem[], span: Span): string {
+function rightPanel(champ: ChampionData, core: CoreItem[], span: Span, offset: [number, number] = [0, 0]): string {
   const W = 360, P = 24;
   const [k, fit] = fitIn(1920 - 12 - span.right - 16, W), X = span.right + 16;
   const playH = champ.play.length ? champ.play.length * 56 + (champ.play.length - 1) * 14 : 0;
   const H = 78 + (champ.play.length ? 30 + playH + 28 : 0) + (core.length ? 30 + 88 + 24 : 0) + 22 + 22;
-  const Y = Math.round((span.top + span.bottom) / 2 - H * k / 2);
-  let s = box(X, Y, W, H, "plate", "", fit) + plate(W, H) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
+  const Y = Math.round((span.top + span.bottom) / 2 - H * k / 2) + offset[1];
+  let s = box(X + offset[0], Y, W, H, "plate", "", fit) + plate(W, H) + dragHandle("right", W) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
   let y = 78;
   if (champ.play.length) {
     s += `<div class="abs label" style="left:${P}px;top:${y}px">怎麼玩</div>`; y += 30;
@@ -172,7 +177,7 @@ export function render(root: HTMLElement, v: View): void {
   // the panels: in champ select and at each pick, never over live play
   if (champ && (pick || st.phase === "champ-select")) {
     html += leftPanel(v, champ, span);
-    if (v.settings.showHint) html += rightPanel(champ, styleOf(v.data, st.champion, v.settings.styleKey)?.core ?? [], span);
+    if (v.settings.showHint) html += rightPanel(champ, styleOf(v.data, st.champion, v.settings.styleKey)?.core ?? [], span, v.settings.panelOffsets.right);
   }
   if (pick) {
     const vds = verdicts(v);

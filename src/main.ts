@@ -50,9 +50,10 @@ async function pageLog() {
   await invoke("page_log", { line });
 }
 
-/** The rects (in window pixels) where the overlay takes the mouse; everywhere else clicks go to the game. */
+/** The rects (in window pixels) where the overlay takes the mouse; everywhere else clicks go to the game. While a panel
+ * is dragged the whole window takes it, so the drag never slips into the game, not even a fast one. */
 async function sendHitRegions() {
-  const rects: Rect[] = [...stage.querySelectorAll<HTMLElement>("[data-hit]")].map((el) => {
+  const rects: Rect[] = drag ? [{ x: 0, y: 0, w: innerWidth, h: innerHeight }] : [...stage.querySelectorAll<HTMLElement>("[data-hit]")].map((el) => {
     const r = el.getBoundingClientRect();
     return { x: r.left, y: r.top, w: r.width, h: r.height };
   });
@@ -83,6 +84,31 @@ stage.addEventListener("click", (e) => {
   } else act({ type: t } as Action);
 });
 addEventListener("keydown", (e) => { if (e.key === "Escape" && ui.settingsOpen) { ui.settingsOpen = false; draw(); } });
+
+// dragging a side panel by its title row; double-click puts it back beside the cards
+type PanelKey = "left" | "right";
+let drag: { key: PanelKey; x: number; y: number; from: [number, number] } | null = null;
+stage.addEventListener("pointerdown", (e) => {
+  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-drag]");
+  if (!el || e.button !== 0) return;
+  const key = el.dataset.drag as PanelKey;
+  drag = { key, x: e.clientX, y: e.clientY, from: settings.panelOffsets[key] ?? [0, 0] };
+  e.preventDefault(); draw();
+});
+addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = Math.round(drag.from[0] + (e.clientX - drag.x) / scale), dy = Math.round(drag.from[1] + (e.clientY - drag.y) / scale);
+  const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
+  settings = { ...settings, panelOffsets: { ...settings.panelOffsets, [drag.key]: [clamp(dx, 1700), clamp(dy, 900)] } };
+  draw();
+});
+addEventListener("pointerup", () => { if (drag) { drag = null; saveSettings(); draw(); } });
+stage.addEventListener("dblclick", (e) => {
+  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-drag]");
+  if (!el) return;
+  const { [el.dataset.drag as PanelKey]: _, ...rest } = settings.panelOffsets;
+  settings = { ...settings, panelOffsets: rest }; saveSettings(); draw();
+});
 addEventListener("resize", () => { fit(); draw(); });
 
 function setState(next: GameState) {
