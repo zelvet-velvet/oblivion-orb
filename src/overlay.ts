@@ -207,10 +207,13 @@ export function render(root: HTMLElement, v: View): void {
   }
   if (pick) {
     const vds = verdicts(v);
-    const showPlates = !v.settings.onlyOnShift || st.shift;
+    // while a card is hovered the game's tooltip opens over the cards' lower half: the plates and the best card's frame
+    // step aside (the banner above the cards says the hovered card's verdict)
+    const hovering = st.hover != null;
+    const showPlates = (!v.settings.onlyOnShift || st.shift) && !hovering;
     st.offers.forEach((o, i) => {
       const vd = vds[i];
-      if (vd.best) html += box(o.card.x - 34, o.card.y - 34, o.card.w + 68, o.card.h + 68, "deco") + hextechFrame(o.card.w, o.card.h) + `</div>`;
+      if (vd.best && !hovering) html += box(o.card.x - 34, o.card.y - 34, o.card.w + 68, o.card.h + 68, "deco") + hextechFrame(o.card.w, o.card.h) + `</div>`;
       if (showPlates) html += nameplate(o, vd);
       // the tag hangs where the game's tooltip opens, so it hides while a card is hovered
       if (vd.reroll && o.reroll && st.hover == null) {
