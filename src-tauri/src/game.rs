@@ -94,7 +94,7 @@ fn in_game(agent: &ureq::Agent) -> Option<Reading> {
         .and_then(|p| p.get("rawChampionName")?.as_str())
         .and_then(|raw| raw.strip_prefix("game_character_displayname_"))
         .map(str::to_string);
-    Some(Reading { phase: "in-game", champion, champion_key: None, test: false })
+    Some(Reading { phase: "in-game", champion, champion_key: None, test: false, fullscreen: false })
 }
 
 /// In champ select: the champion in the player's own cell (ARAM gives one; a pick intent counts while hovering).
@@ -106,7 +106,7 @@ fn champ_select(agent: &ureq::Agent, c: &Client) -> Option<Reading> {
         .iter()
         .filter_map(|k| me.get(*k).and_then(Value::as_i64))
         .find(|&k| k > 0);
-    Some(Reading { phase: "champ-select", champion: None, champion_key: key, test: false })
+    Some(Reading { phase: "champ-select", champion: None, champion_key: key, test: false, fullscreen: false })
 }
 
 fn read(agent: &ureq::Agent) -> Reading {
