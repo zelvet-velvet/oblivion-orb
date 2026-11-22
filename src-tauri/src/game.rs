@@ -124,7 +124,10 @@ pub fn spawn(app: AppHandle, in_game: Arc<std::sync::atomic::AtomicBool>) {
                 last = Some(now);
                 sent = Instant::now();
             }
-            thread::sleep(Duration::from_secs(1));
+            // the client is asked once a second only in champ select or in game; idle, every 5 s, so a client left
+            // open for hours is not asked 86 400 times a day
+            let pause = if now.phase == "idle" { 5 } else { 1 };
+            thread::sleep(Duration::from_secs(pause));
         }
     });
 }
