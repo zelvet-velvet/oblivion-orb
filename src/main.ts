@@ -7,6 +7,7 @@
 import dataJson from "./data/game-data.json";
 import { gameLayer, SAMPLES } from "./mock";
 import { makeNameMatcher } from "./names";
+import { SHARD_NAME, shardOf } from "./shards";
 import { render, type Action, type UiState } from "./overlay";
 import { DEFAULT_SETTINGS, type GameData, type GameState, type Mode, type Rect, type Settings } from "./types";
 
@@ -41,7 +42,8 @@ function draw() {
 /** What the page shows, into the app's reader.log when it changes. */
 async function pageLog() {
   const champ = state.champion ? (data.champions[state.champion] ? state.champion : `${state.champion} (no data)`) : "none";
-  const cards = state.offers.map((o) => (o.id != null ? data.augments[String(o.id)]?.name ?? o.id : "unread")).join(", ");
+  const cards = state.offers.map((o) => o.shard !== undefined ? (o.shard ? SHARD_NAME[o.shard] : "unknown shard")
+    : o.id != null ? data.augments[String(o.id)]?.name ?? o.id : "unread").join(", ");
   const line = `${state.phase} · champion ${champ}${state.offers.length ? ` · ${state.offers.length} cards: ${cards}` : ""}`
     + ` · ${stage.querySelectorAll(".np").length} plates · window ${innerWidth}x${innerHeight}`;
   if (line === lastLine) return;
@@ -143,7 +145,11 @@ if (inApp) {
         if (state.phase === "augment-pick") setState({ ...state, phase: "in-game", offers: [], hover: null });
         return;
       }
-      const offers = p.cards.map((c) => ({ id: matchName(c.name), card: toFrame(c.card), reroll: c.reroll ? toFrame(c.reroll) : null }));
+      const offers = p.cards.map((c) => {
+        const shard = shardOf(c.name);   // a 能力值加成 card, or undefined for an augment
+        return { id: shard === undefined ? matchName(c.name) : null, ...(shard !== undefined && { shard }),
+                 card: toFrame(c.card), reroll: c.reroll ? toFrame(c.reroll) : null };
+      });
       setState({ ...state, phase: "augment-pick", offers });
     });
     await listen<Pointer>("pointer", ({ payload: p }) => {

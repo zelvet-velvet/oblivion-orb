@@ -1,6 +1,7 @@
 // Ranks the offered augments for the champion and play style. Tiers, verdicts and reasons only: no win rates exist here
 // (tools/build_data.py keeps none). It marks the best card and, at most, one card worth rerolling; the player decides.
 
+import { SHARD_NAME, shardTier, type Stat } from "./shards";
 import type { GameData, Settings, StyleData, Tier } from "./types";
 
 export const TIER_ORDER: Tier[] = ["S", "A", "B", "C"];
@@ -8,6 +9,7 @@ export const VERDICT: Record<Tier, string> = { S: "最合", A: "很合", B: "還
 
 export interface Verdict {
   id: number | null;
+  name?: string;              // a shard's name (augments are named by their id)
   tier: Tier | null;          // null: not rated for this champion (or the card is not read)
   label: string;
   why: string;
@@ -36,14 +38,21 @@ export function shortWhy(why: string, max = 8): string {
  */
 export function rankOffers(
   data: GameData, champion: string | null, settings: Settings,
-  offers: { id: number | null; canReroll: boolean }[],
+  offers: { id: number | null; canReroll: boolean; shard?: Stat | null }[],
 ): Verdict[] {
   const style = styleOf(data, champion, settings.styleKey);
   const row = new Map<number, { tier: Tier; why: string; order: number }>();
   const champ = champion ? data.champions[champion] : undefined;
   (style && champ ? champ.tiers[style.tierKey] ?? [] : []).forEach(([id, tier, why], order) => row.set(id, { tier, why, order }));
 
-  const out: Verdict[] = offers.map(({ id }) => {
+  const out: Verdict[] = offers.map(({ id, shard }) => {
+    if (shard !== undefined) {   // a 能力值加成 card: rated from the style's role and damage, not from Morellonomicon
+      const name = shard ? SHARD_NAME[shard] : "能力值碎片";
+      if (!shard) return { id, name, tier: null, label: "未評分", why: "還沒有這種碎片的分級", best: false, reroll: false };
+      if (!style) return { id, name, tier: null, label: "未評分", why: "還沒有這隻英雄的資料", best: false, reroll: false };
+      const [tier, why] = shardTier(shard, style.role, style.damage);
+      return { id, name, tier, label: VERDICT[tier], why, best: false, reroll: false };
+    }
     const r = id != null && settings.useTiers ? row.get(id) : undefined;
     if (id == null) return { id, tier: null, label: "未辨識", why: "還沒看到這張卡", best: false, reroll: false };
     if (!r) return { id, tier: null, label: "未評分", why: style ? "這隻英雄還沒有這張的分級" : "還沒有這隻英雄的資料", best: false, reroll: false };
@@ -52,7 +61,8 @@ export function rankOffers(
 
   const key = (i: number) => {
     const v = out[i], id = v.id;
-    return v.tier == null || id == null ? [99, 1e9] : [rankOf(v.tier), row.get(id)!.order];
+    if (v.tier == null) return [99, 1e9];
+    return [rankOf(v.tier), id == null ? i : row.get(id)!.order];   // shards: ties go to the leftmost
   };
   const rated = out.map((_, i) => i).filter((i) => out[i].tier != null);
   if (rated.length === 0) return out;

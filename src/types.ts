@@ -1,6 +1,8 @@
 // The shapes the overlay works with. Screen positions are in the 1920 × 1080 reference frame the screens were drawn in;
 // the stage scales it to the real screen (the game's pick screen scales the same way at 16:9).
 
+import type { Stat } from "./shards";
+
 export type Tier = "S" | "A" | "B" | "C";
 export type Rarity = "銀" | "金" | "稜鏡";
 export type Mode = "穩" | "均衡" | "貪";
@@ -9,7 +11,8 @@ export interface Rect { x: number; y: number; w: number; h: number }
 
 /** One augment on offer: its id once the card is read, where the card and its reroll button sit. */
 export interface Offer {
-  id: number | null;          // null: the card is not recognised yet
+  id: number | null;          // null: the card is not recognised yet (or it is a shard)
+  shard?: Stat | null;        // a 能力值加成 card: its stat (null: a shard of a stat not known); absent for augments
   card: Rect;
   reroll: Rect | null;        // null: no reroll button (none left)
 }

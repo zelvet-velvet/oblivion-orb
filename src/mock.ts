@@ -24,6 +24,10 @@ export const SAMPLES: Record<string, { state: GameState }> = {
   jhin: {   // four cards (Jhin's band): the side panels shrink to fit
     state: { phase: "augment-pick", champion: "Jhin", round: "稜鏡", offers: sampleOffers([1048, 1349, 2098, 2099]), shift: false, hover: null },
   },
+  shards: {   // a 能力值加成 round: stat shards rated from the play style
+    state: { phase: "augment-pick", champion: "Ekko", round: null,
+      offers: sampleOffers([null, null, null]).map((o, k) => ({ ...o, shard: (["ap", "resist", "magicpen"] as const)[k] })), shift: false, hover: null },
+  },
   unknown: {   // a card not read yet and a pick with no reroll left
     state: { phase: "augment-pick", champion: "DrMundo", round: "金",
       offers: sampleOffers([1353, null, 3071]).map((o) => ({ ...o, reroll: null })), shift: false, hover: null },

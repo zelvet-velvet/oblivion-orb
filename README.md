@@ -10,6 +10,7 @@ Sibling of [Morellonomicon (黑魔禁書)](https://github.com/zelvet-velvet/More
 - **Play styles** on the left: pick one (Dr. Mundo: Q 消耗 · 穿透, 坦克, 坦克輸出) and the ranking follows it.
 - **The champion's special play** on top (Mundo: Q takes no AP, AD or health, so look for damage amps and penetration).
 - **Under each card**, a plate with the tier in the game's augment tile (S prismatic, A/B gold, C dim silver), a one-word verdict and why. The best card gets a line round it; the card worth rerolling gets corner marks on its reroll button.
+- **能力值加成 rounds** (stat shards such as 魔法攻擊碎片 or 不屈碎片): rated from the play style's role and damage type, as 很合, 還行 or 不合.
 - **Hold Shift** over a card: the game's own detail, with the phrase that matters for your champion marked.
 
 ## How it works

@@ -35,7 +35,7 @@ function cardSpan(offers: Offer[]): Span {
 }
 
 export function verdicts(v: View): Verdict[] {
-  return rankOffers(v.data, v.state.champion, v.settings, v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null })));
+  return rankOffers(v.data, v.state.champion, v.settings, v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null, shard: o.shard })));
 }
 
 /** The panel's title row: drag it to move the panel, double-click it to put the panel back beside the cards. */
@@ -131,7 +131,7 @@ function banner(v: View, vd: Verdict): string {
   const champ = v.state.champion ? v.data.champions[v.state.champion] : undefined;
   const a = vd.id != null ? v.data.augments[String(vd.id)] : undefined;
   const W = 760, H = 132, X = 960 - W / 2, Y = 34, t = vd.tier, tx = t ? 100 : 28;
-  const head = `${a?.name ?? "這張卡"} · ${vd.label}${champ ? `，對${champ.name}` : ""}`;
+  const head = `${a?.name ?? vd.name ?? "這張卡"} · ${vd.label}${champ ? `，對${champ.name}` : ""}`;
   return box(X, Y, W, H, "plate banner") + plate(W, H, t ? METAL[t].ink : DIM, 0.8)
     + (t ? `<div class="abs" style="left:24px;top:36px">${tile(t, 58)}</div>` : "")
     + `<div class="abs b-head" style="left:${tx}px;color:${t ? VERDICT_INK[t] : DIM}">${esc(head)}</div>`
