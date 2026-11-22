@@ -5,7 +5,7 @@
 ## Start here
 - **Work log**: the private Folio vault `../oblivion-orb-folio` (GitHub `zelvet-velvet/oblivion-orb-folio`): progress (`LLM/DEV_STATUS.md`, read only the part you need), decisions (`Notes/Decisions.md`: Riot's policy, how the game is read, the stack, the data), the screens (`Spec/Screens.md`, Vellum JSON in `Spec/Screens/`). Its own `AGENTS.md` and `LLM/LLM_GUIDE.md` give its rules; never write work-log notes into this public repo.
 - Commands are typed as `/cmd-*`; the work-log skills (`cmd-*`, `git-workflow`, `test-queue`) are symlinks from the vault, listed in `.git/info/exclude` (`python3 ../oblivion-orb-folio/Tools/setup/folio.py link` makes them). A cloud session has no vault: it records nothing in the work log and says so.
-- **Data** comes from the Morellonomicon repo (`../Morellonomicon`, public): `_data/augment-tiers.json`, `_data/item-builds.json`, the augment rules in `tools/augment_tiers.py`. Change data there, not here.
+- **Data** comes from the Morellonomicon repo (`../Morellonomicon`, public): `_data/augment-tiers.json`, `_data/item-builds.json`, the augment rules in `tools/reason/augment_tiers.py`. Change data there, not here.
 - UI text is Traditional Chinese; code, notes and commits English. Reply in the language Zaviel writes in.
 
 ## Hard rules (Riot's developer policy, see Notes/Decisions.md in the vault)
