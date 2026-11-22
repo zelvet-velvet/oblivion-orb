@@ -222,6 +222,22 @@ fn differs(a: &[f32], b: &[f32]) -> bool {
     a.len() != b.len() || a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32 > 18.0
 }
 
+/// Puts the overlay back on top of the topmost windows (a full-screen window can cover it) without taking the focus.
+fn raise(app: &AppHandle) {
+    #[cfg(windows)]
+    if let Some(win) = app.get_webview_window("main") {
+        if let Ok(h) = win.hwnd() {
+            use windows_sys::Win32::UI::WindowsAndMessaging::*;
+            unsafe {
+                SetWindowPos(h.0 as _, HWND_TOPMOST, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS);
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = app;
+}
+
 /// Keep our own window out of screen captures (Windows 10 2004 and later), so the reader never sees the overlay.
 pub fn exclude_from_capture(app: &AppHandle, diag: &Diag) {
     #[cfg(windows)]
@@ -249,8 +265,9 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
         let mut names: Vec<String> = Vec::new();
         let mut last: Option<Pick> = None;
         let mut last_sent = Instant::now();
-        let mut last_look = Instant::now() - Duration::from_secs(60); // the "look" line in the log, every 10 s
+        let mut last_look = Instant::now().checked_sub(Duration::from_secs(60)).unwrap_or_else(Instant::now); // the "look" line in the log, every 10 s
         let mut screen_logged = (0.0, 0.0, 0.0);
+        let mut raised = Instant::now().checked_sub(Duration::from_secs(60)).unwrap_or_else(Instant::now);
         let close = |app: &AppHandle, diag: &Diag, why: &str| {
             diag.log(&format!("pick closed ({why})"));
             let _ = app.emit("pick", Pick { open: false, cards: vec![] });
@@ -331,6 +348,10 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
                 open = now_open;
             }
             let Some(n) = open else { continue };
+            if raised.elapsed() > Duration::from_secs(2) {
+                raised = Instant::now();
+                raise(&app);
+            }
 
             let css = |r: Rect| Rect { x: (r.x - mx) / scale, y: (r.y - my) / scale, w: r.w / scale, h: r.h / scale };
             let mut cards = Vec::with_capacity(n);

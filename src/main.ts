@@ -32,9 +32,22 @@ function fit() {
   for (const el of [stage, document.getElementById("game")]) if (el) el.style.transform = `translate(${offX}px, ${offY}px) scale(${scale})`;
 }
 
+let lastLine = "";
 function draw() {
   render(stage, { data, state, settings, ui });
-  if (inApp) void sendHitRegions();
+  if (inApp) { void sendHitRegions(); void pageLog(); }
+}
+
+/** What the page shows, into the app's reader.log when it changes. */
+async function pageLog() {
+  const champ = state.champion ? (data.champions[state.champion] ? state.champion : `${state.champion} (no data)`) : "none";
+  const cards = state.offers.map((o) => (o.id != null ? data.augments[String(o.id)]?.name ?? o.id : "unread")).join(", ");
+  const line = `${state.phase} · champion ${champ}${state.offers.length ? ` · ${state.offers.length} cards: ${cards}` : ""}`
+    + ` · ${stage.querySelectorAll(".np").length} plates · window ${innerWidth}x${innerHeight}`;
+  if (line === lastLine) return;
+  lastLine = line;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("page_log", { line });
 }
 
 /** The rects (in window pixels) where the overlay takes the mouse; everywhere else clicks go to the game. */

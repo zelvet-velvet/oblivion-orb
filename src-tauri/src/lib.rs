@@ -12,10 +12,16 @@ use tauri::menu::{CheckMenuItem, Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 
+/// The page's own line in reader.log: what it drew (the phase, the champion, the cards it matched).
+#[tauri::command]
+fn page_log(diag: tauri::State<'_, Arc<diag::Diag>>, line: String) {
+    diag.log(&format!("page: {line}"));
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(pointer::HitRegions::default())
-        .invoke_handler(tauri::generate_handler![pointer::set_hit_regions])
+        .invoke_handler(tauri::generate_handler![pointer::set_hit_regions, page_log])
         .setup(|app| {
             let win = app.get_webview_window("main").expect("the main window");
             // cover the primary screen (the game, borderless); clicks pass through until the cursor is over a control
@@ -27,6 +33,7 @@ pub fn run() {
 
             let dir = app.path().app_log_dir().unwrap_or_else(|_| std::env::temp_dir().join("oblivion-orb"));
             let diag = Arc::new(diag::Diag::new(dir));
+            app.manage(diag.clone());
             diag.log(&format!("遺忘寶珠 {} started", app.package_info().version));
 
             let test = CheckMenuItem::with_id(app, "test", "測試模式（不用進遊戲）", true, false, None::<&str>)?;
