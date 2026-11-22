@@ -152,14 +152,15 @@ def main():
                         or next((n for n, d, _ in listed if d == dmg), None))
                 tk = (st.get("name") if st.get("name") in tiers else same if same else close if close in tiers
                       else "main" if "main" in tiers else next(iter(tiers)))
-                ids = ([c["id"] for c in st.get("core", [])] + [c["id"] for c in st.get("third", [])[:1]])[:3]
                 # the whole build, for the item set written into the client (the shop's recommended tab): ids only
                 ids_of = lambda rows: [r["id"] for r in rows or [] if isinstance(r, dict) and r.get("id")]
                 full = {"core": ids_of(st.get("core")), "third": ids_of(st.get("third")),
                         "boots": (st.get("boots") or {}).get("id"), "late": ids_of(st.get("late"))}
                 boots = full["boots"]
+                # the build path the right panel shows: the core in order, the third item's choices, the boots, the late items
                 out_styles.append({"key": str(k), "name": st.get("name", ""), "role": build_role(st, dmg), "damage": dmg,
-                                   "core": [item(i) for i in ids], "tierKey": tk, "build": full,
+                                   "core": [item(i) for i in full["core"]], "third": [item(i) for i in full["third"][:3]],
+                                   "late": [item(i) for i in full["late"][:3]], "tierKey": tk, "build": full,
                                    "boots": item(boots) if boots else None,
                                    "warn": st.get("warn", "")})   # few: few games, weak: losing; the result is not sure
         else:   # no builds: the tier lists are the styles

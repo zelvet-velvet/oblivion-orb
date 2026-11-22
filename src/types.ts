@@ -53,9 +53,12 @@ export interface AugmentInfo { name: string; rarity: Rarity | string; icon: stri
 export type TierRow = [number, Tier, string, string];
 export type Role = "tank" | "fighter" | "mage" | "marksman" | "assassin" | "support";
 export type Damage = "phys" | "magic";
-/** A play style: one of the champion's builds (Morellonomicon's item-builds), ranked by the closest tier list (tierKey). */
+/** A play style: one of the champion's builds (Morellonomicon's item-builds), ranked by the closest tier list (tierKey).
+ * The panel groups the styles by role and damage (styles.ts); core, third, boots and late are the build path it shows. */
 export interface StyleData {
   key: string; name: string; role: Role; damage: Damage; core: CoreItem[]; tierKey: string; build?: Build;
+  third?: CoreItem[];         // the third item's choices (at most three)
+  late?: CoreItem[];          // the late items (at most three)
   boots?: CoreItem | null;    // the style's boots
   warn?: "few" | "weak" | ""; // few: few games behind it, weak: it loses; either way its result is not sure
 }
