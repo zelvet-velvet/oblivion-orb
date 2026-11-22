@@ -18,10 +18,20 @@ fn page_log(diag: tauri::State<'_, Arc<diag::Diag>>, line: String) {
     diag.log(&format!("page: {line}"));
 }
 
+/// The champion's builds as item sets, into the client (in champ select): written on a thread, the result in reader.log.
+#[tauri::command]
+fn write_item_sets(diag: tauri::State<'_, Arc<diag::Diag>>, sets: Vec<serde_json::Value>) {
+    let diag = diag.inner().clone();
+    std::thread::spawn(move || match game::write_item_sets(sets) {
+        Ok(line) => diag.log(&line),
+        Err(e) => diag.log(&format!("item sets not written: {e}")),
+    });
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(pointer::HitRegions::default())
-        .invoke_handler(tauri::generate_handler![pointer::set_hit_regions, page_log])
+        .invoke_handler(tauri::generate_handler![pointer::set_hit_regions, page_log, write_item_sets])
         .setup(|app| {
             let win = app.get_webview_window("main").expect("the main window");
             // cover the primary screen (the game, borderless); clicks pass through until the cursor is over a control

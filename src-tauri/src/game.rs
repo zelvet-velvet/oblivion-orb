@@ -173,3 +173,38 @@ pub fn spawn(app: AppHandle, in_game: Arc<std::sync::atomic::AtomicBool>, diag: 
         }
     });
 }
+
+/// Writes the page's item sets (the champion's builds) into the client, so the shop lists them in game: the player's
+/// own sets stay, ours (titled "遺忘寶珠 · …") are replaced. Each set is tied to the map of the game being picked for
+/// (the gameflow session's), so they never show on another map. The client's own local API, the way any build app does.
+pub fn write_item_sets(mut sets: Vec<Value>) -> Result<String, String> {
+    const PREFIX: &str = "遺忘寶珠 · ";
+    let agent = agent();
+    let c = client().ok_or("no League client (no lockfile)")?;
+    let me = lcu(&agent, &c, "/lol-summoner/v1/current-summoner").ok_or("no summoner")?;
+    let id = me.get("summonerId").and_then(Value::as_i64).ok_or("no summoner id")?;
+    let map = lcu(&agent, &c, "/lol-gameflow/v1/session")
+        .and_then(|s| s.pointer("/map/id").and_then(Value::as_i64))
+        .filter(|&m| m > 0)
+        .unwrap_or(12); // the Howling Abyss
+    for s in &mut sets {
+        s["associatedMaps"] = serde_json::json!([map]);
+    }
+    let path = format!("/lol-item-sets/v1/item-sets/{id}/sets");
+    let mut all = lcu(&agent, &c, &path).ok_or("the client's item sets did not answer")?;
+    let list = all.get_mut("itemSets").and_then(Value::as_array_mut).ok_or("no itemSets in the client's answer")?;
+    let before = list.len();
+    list.retain(|s| !s.get("title").and_then(Value::as_str).is_some_and(|t| t.starts_with(PREFIX)));
+    let kept = list.len();
+    let n = sets.len();
+    list.extend(sets);
+    all["timestamp"] = serde_json::json!(std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64));
+    agent
+        .put(&format!("https://127.0.0.1:{}{}", c.port, path))
+        .set("Authorization", &c.auth)
+        .send_json(all)
+        .map_err(|e| format!("the client refused the item sets: {e}"))?;
+    Ok(format!("{n} item sets written for map {map} ({} of ours replaced, {kept} of the player's kept)", before - kept))
+}

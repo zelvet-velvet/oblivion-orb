@@ -36,13 +36,14 @@ export interface Settings {
   rerollBelow: Tier;          // tiers below this one may be marked for a reroll
   showHint: boolean;          // 怎麼玩、核心裝 (the right panel)
   onlyOnShift: boolean;       // the verdicts show only while Shift is held
+  itemSets: boolean;          // write the champion's builds into the client as item sets (the shop's recommended tab)
   /** where the player dragged the side panels: [dx, dy] from their place beside the cards, in 1920 × 1080 pixels */
   panelOffsets: { left?: [number, number]; right?: [number, number]; toggle?: [number, number] };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   styleKey: null, mode: "均衡", useTiers: true, useSynergy: true,
-  rerollBelow: "B", showHint: true, onlyOnShift: false, panelOffsets: {},
+  rerollBelow: "B", showHint: true, onlyOnShift: false, itemSets: true, panelOffsets: {},
 };
 
 // ---- the data built by tools/build_data.py from Morellonomicon ----
@@ -52,7 +53,10 @@ export type TierRow = [number, Tier, string, string];
 export type Role = "tank" | "fighter" | "mage" | "marksman" | "assassin" | "support";
 export type Damage = "phys" | "magic";
 /** A play style: one of the champion's builds (Morellonomicon's item-builds), ranked by the closest tier list (tierKey). */
-export interface StyleData { key: string; name: string; role: Role; damage: Damage; core: CoreItem[]; tierKey: string }
+export interface StyleData { key: string; name: string; role: Role; damage: Damage; core: CoreItem[]; tierKey: string; build?: Build }
+/** The build's whole item list (ids), for the item set written into the client: core first, then the third item's
+ * choices, the boots and the late items. */
+export interface Build { core: number[]; third: number[]; boots: number | null; late: number[] }
 /** 怎麼玩: one core ability, from the champion note's one-line play summary */
 export interface PlayRow { key: string; title: string; detail: string; icon: string }
 export interface CoreItem { id: number; name: string; icon: string }

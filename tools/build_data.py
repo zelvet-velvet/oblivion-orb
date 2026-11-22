@@ -4,7 +4,7 @@
     python3 -I tools/build_data.py [--from ../Morellonomicon]
 
 Reads Morellonomicon's `_data/augment-tiers.json` (each champion's augment tiers and reasons, per play style),
-`_data/item-builds.json` (core items), and its augment, champion and item notes (names, icons; the champion's numeric key,
+`_data/item-builds.json` (core items, and each build's whole item list for the client's item sets), and its augment, champion and item notes (names, icons; the champion's numeric key,
 roles, damage, skills and its one-line play summary `soul`), and writes `src/data/game-data.json`. Augment win rates never leave Morellonomicon: of each tier row only the tier, the reason and the
 row's order are kept. Standard library only.
 """
@@ -132,8 +132,12 @@ def main():
                 dmg = build_damage(st)
                 tk = ("ap" if dmg == "magic" else "ad") if ("ap" if dmg == "magic" else "ad") in tiers else "main" if "main" in tiers else next(iter(tiers))
                 ids = ([c["id"] for c in st.get("core", [])] + [c["id"] for c in st.get("third", [])[:1]])[:3]
+                # the whole build, for the item set written into the client (the shop's recommended tab): ids only
+                ids_of = lambda rows: [r["id"] for r in rows or [] if isinstance(r, dict) and r.get("id")]
+                full = {"core": ids_of(st.get("core")), "third": ids_of(st.get("third")),
+                        "boots": (st.get("boots") or {}).get("id"), "late": ids_of(st.get("late"))}
                 out_styles.append({"key": str(k), "name": st.get("name", ""), "role": build_role(st, dmg), "damage": dmg,
-                                   "core": [item(i) for i in ids], "tierKey": tk})
+                                   "core": [item(i) for i in ids], "tierKey": tk, "build": full})
         else:   # no builds: the tier lists are the styles
             for key, st in styles.items():
                 out_styles.append({"key": key, "name": first_role if key == "main" and first_role else st.get("name", key),
