@@ -53,21 +53,23 @@ export interface AugmentInfo { name: string; rarity: Rarity | string; icon: stri
 export type TierRow = [number, Tier, string, string];
 export type Role = "tank" | "fighter" | "mage" | "marksman" | "assassin" | "support";
 export type Damage = "phys" | "magic";
-/** A play style: one of the champion's builds (Morellonomicon's item-builds), ranked by the closest tier list (tierKey).
- * The panel groups the styles by role and damage (styles.ts); core, third, boots and late are the build path it shows. */
+/** A play style: a role and damage (AP 刺客, AD 戰士, 坦克) with its build (Morellonomicon's item-builds), ranked by its own
+ * tier list (tierKey). core, boots and late are the build path the right panel shows. */
 export interface StyleData {
   key: string; name: string; role: Role; damage: Damage; core: CoreItem[]; tierKey: string; build?: Build;
-  third?: CoreItem[];         // the third item's choices (at most three)
-  late?: CoreItem[];          // the late items (at most three)
+  late?: LateItem[];          // items four to six, by need (at most five)
   boots?: CoreItem | null;    // the style's boots
+  share?: number;             // how many of the champion's players play it (0-1)
   warn?: "few" | "weak" | ""; // few: few games behind it, weak: it loses; either way its result is not sure
 }
-/** The build's whole item list (ids), for the item set written into the client: core first, then the third item's
- * choices, the boots and the late items. */
-export interface Build { core: number[]; third: number[]; boots: number | null; late: number[] }
+/** The build's whole item list (ids), for the item set written into the client: the three core items, another core, the
+ * boots and items four to six. */
+export interface Build { core: number[]; alt?: number[]; boots: number | null; late: number[] }
 /** 怎麼玩: one core ability, from the champion note's one-line play summary */
 export interface PlayRow { key: string; title: string; detail: string; icon: string }
 export interface CoreItem { id: number; name: string; icon: string }
+/** An item four to six: what it adds (輸出, 生存, 穿透, 重創, 功能, 機動), or when to buy it (敵方回血多時) */
+export interface LateItem extends CoreItem { need?: string; when?: string }
 export interface ChampionData {
   key: number | null; name: string; icon: string; styles: StyleData[];
   tiers: Record<string, TierRow[]>;   // main, and ad / ap / onhit where Morellonomicon ranks them apart

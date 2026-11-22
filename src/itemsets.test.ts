@@ -4,7 +4,7 @@ import type { ChampionData } from "./types";
 
 const st = (key: string, name: string, core: number[]) => ({
   key, name, role: "tank" as const, damage: "magic" as const, core: [], tierKey: "main",
-  build: { core, third: [3065, core[0]], boots: 3111, late: [3109] },
+  build: { core, alt: [3065, core[0]], boots: 3111, late: [3109] },
 });
 const champ: ChampionData = { key: 12, name: "亞歷斯塔", icon: "", tiers: {}, play: [], styles: [st("0", "坦克", [3084, 3083]), st("1", "坦克輸出", [3084, 2502])] };
 
@@ -19,7 +19,7 @@ describe("itemSets", () => {
   it("blocks in build order, no item twice", () => {
     const [s] = itemSets(champ, null);
     expect(s.blocks.map((b) => [b.type, b.items.map((i) => i.id)])).toEqual([
-      ["核心裝（照順序做）", ["3084", "3083"]], ["第三件（擇一）", ["3065"]], ["鞋子", ["3111"]], ["後期（看局勢）", ["3109"]]]);
+      ["核心裝（照順序做）", ["3084", "3083"]], ["鞋子", ["3111"]], ["第四到六件（依需要挑）", ["3109"]], ["另一種核心", ["3065"]]]);
   });
   it("four sets at most: the chosen style and the next most played", () => {
     const many = { ...champ, styles: ["0", "1", "2", "3", "4", "5"].map((k) => st(k, `玩法${k}`, [3084, 3083])) };

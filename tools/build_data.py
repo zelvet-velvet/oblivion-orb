@@ -4,7 +4,7 @@
     python3 -I tools/build_data.py [--from ../Morellonomicon]
 
 Reads Morellonomicon's `_data/augment-tiers.json` (each champion's augment tiers and reasons, per play style),
-`_data/item-builds.json` (core items, and each build's whole item list for the client's item sets), and its augment, champion and item notes (names, icons; the champion's numeric key,
+`_data/item-builds.json` (each play style's build: three core items, another core, boots, items four to six by need), and its augment, champion and item notes (names, icons; the champion's numeric key,
 roles, damage, skills and its one-line play summary `soul`), and writes `src/data/game-data.json`. Augment win rates never leave Morellonomicon: of each tier row only the tier, the reason and the
 row's order are kept. Standard library only.
 """
@@ -116,10 +116,11 @@ def main():
                  for key, st in styles.items()}   # each list already in the order Morellonomicon ranks them
 
         def build_damage(st):
-            n = st.get("name", "").replace("魔法彎刀", "")   # the item's name, not a damage type
-            if "AP" in n or "法" in n:
+            """A style is a role and damage (Morellonomicon's build_tiers.py): "AP 刺客", "AD 戰士"; 坦克 and 輔助 take their core's."""
+            n = st.get("name", "")
+            if n.startswith("AP"):
                 return "magic"
-            if "AD" in n or "暴擊" in n or "穿甲" in n:
+            if n.startswith("AD"):
                 return "phys"
             tags = [t for c in st.get("core", []) for t in item_tags.get(c["id"], [])]
             ap, ad = tags.count("SpellDamage"), tags.count("Damage")
@@ -127,41 +128,38 @@ def main():
 
         def build_role(st, dmg):
             n = st.get("name", "")
-            # a hybrid style's noun is its last word (坦克輔助 is a support, 法術戰士 a fighter): those first
-            for words, role in ((("坦克輸出", "法術戰士"), "fighter"), (("坦克輔助",), "support"), (("坦克",), "tank"), (("刺客",), "assassin"), (("射手",), "marksman"), (("輔助", "補師"), "support"),
-                                (("法師", "法術"), "mage"), (("戰士", "輸出", "斬殺", "連招", "消耗", "穿甲"), "fighter")):
-                if any(w in n for w in words):
+            for word, role in (("坦克", "tank"), ("輔助", "support"), ("刺客", "assassin"), ("射手", "marksman"), ("法師", "mage"),
+                               ("戰士", "fighter"), ("暴擊", "marksman")):
+                if word in n:
                     return role
-            if "特效" in n:
+            if "特效" in n:   # AP 特效 (Gwen) fights like a mage, AD 特效 (Master Yi) like a marksman
                 return "mage" if dmg == "magic" else "marksman"
             return ROLE.get(first_role, "fighter")
 
         out_styles = []
-        if b:   # the play styles are the champion's builds; each ranks augments by its own tier list (Morellonomicon keys one per
-            # play style when our crawl splits the games by style), else the closest one (ap / ad / main, from resg.top's totals)
-            # styles with a list of their own, most played first: (name, damage, role)
+        if b:   # the play styles are the champion's builds, a role and damage each, most played first; each ranks augments by its
+            # own tier list (Morellonomicon keys one per style), else the most played list of its role and damage, else its damage's
             listed = [(x.get("name"), build_damage(x), build_role(x, build_damage(x))) for x in b if x.get("name") in tiers]
-            for k, st in enumerate(b):   # all of them: the app shows four as tiles and the rest under 更多玩法
+            ids_of = lambda rows: [r["id"] for r in rows or [] if isinstance(r, dict) and r.get("id")]
+            for k, st in enumerate(b):
                 dmg = build_damage(st)
-                close = "ap" if dmg == "magic" else "ad"
-                # a rare style has no list of its own: the most played style with one of the same role and damage, else damage
                 role = build_role(st, dmg)
+                close = "ap" if dmg == "magic" else "ad"
                 guard = {"tank", "support"}   # a damage style takes a damage style's list before a tank's
                 same = (next((n for n, d, r in listed if d == dmg and r == role), None)
                         or next((n for n, d, r in listed if d == dmg and (r in guard) == (role in guard)), None)
                         or next((n for n, d, _ in listed if d == dmg), None))
                 tk = (st.get("name") if st.get("name") in tiers else same if same else close if close in tiers
                       else "main" if "main" in tiers else next(iter(tiers)))
+                alt = (st.get("alts") or [[]])[0]
                 # the whole build, for the item set written into the client (the shop's recommended tab): ids only
-                ids_of = lambda rows: [r["id"] for r in rows or [] if isinstance(r, dict) and r.get("id")]
-                full = {"core": ids_of(st.get("core")), "third": ids_of(st.get("third")),
-                        "boots": (st.get("boots") or {}).get("id"), "late": ids_of(st.get("late"))}
-                boots = full["boots"]
-                # the build path the right panel shows: the core in order, the third item's choices, the boots, the late items
-                out_styles.append({"key": str(k), "name": st.get("name", ""), "role": build_role(st, dmg), "damage": dmg,
-                                   "core": [item(i) for i in full["core"]], "third": [item(i) for i in full["third"][:3]],
-                                   "late": [item(i) for i in full["late"][:3]], "tierKey": tk, "build": full,
-                                   "boots": item(boots) if boots else None,
+                full = {"core": ids_of(st.get("core")), "alt": ids_of(alt), "boots": (st.get("boots") or {}).get("id"),
+                        "late": ids_of(st.get("late"))}
+                # items four to six with what each adds (輸出, 生存 …) or when to buy it (敵方回血多時)
+                late = [{**item(o["id"]), "need": o.get("need", ""), "when": o.get("when", "")} for o in st.get("late") or []]
+                out_styles.append({"key": str(k), "name": st.get("name", ""), "role": role, "damage": dmg, "tierKey": tk, "build": full,
+                                   "core": [item(i) for i in full["core"]], "boots": item(full["boots"]) if full["boots"] else None,
+                                   "late": late, "share": st.get("share", 0),
                                    "warn": st.get("warn", "")})   # few: few games, weak: losing; the result is not sure
         else:   # no builds: the tier lists are the styles
             for key, st in styles.items():

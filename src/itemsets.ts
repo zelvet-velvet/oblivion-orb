@@ -34,8 +34,8 @@ export function itemSets(champ: ChampionData, styleKey: string | null): ItemSet[
       title: `${SET_PREFIX}${champ.name} ${st.name}`, type: "custom", map: "any", mode: "any", sortrank: rank,
       startedFrom: "blank", uid: uid(champ.key!, rank),
       associatedChampions: [champ.key!], associatedMaps: [], preferredItemSlots: [],
-      blocks: [...block("核心裝（照順序做）", b.core, seen), ...block("第三件（擇一）", b.third, seen),
-               ...block("鞋子", [b.boots], seen), ...block("後期（看局勢）", b.late, seen)],
+      blocks: [...block("核心裝（照順序做）", b.core, seen), ...block("鞋子", [b.boots], seen),
+               ...block("第四到六件（依需要挑）", b.late, seen), ...block("另一種核心", b.alt ?? [], seen)],
     };
   });
 }
