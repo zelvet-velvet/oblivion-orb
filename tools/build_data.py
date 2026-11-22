@@ -127,7 +127,8 @@ def main():
 
         def build_role(st, dmg):
             n = st.get("name", "")
-            for words, role in ((("坦克輸出",), "fighter"), (("坦克",), "tank"), (("刺客",), "assassin"), (("射手",), "marksman"), (("輔助", "補師"), "support"),
+            # a hybrid style's noun is its last word (坦克輔助 is a support, 法術戰士 a fighter): those first
+            for words, role in ((("坦克輸出", "法術戰士"), "fighter"), (("坦克輔助",), "support"), (("坦克",), "tank"), (("刺客",), "assassin"), (("射手",), "marksman"), (("輔助", "補師"), "support"),
                                 (("法師", "法術"), "mage"), (("戰士", "輸出", "斬殺", "連招", "消耗", "穿甲"), "fighter")):
                 if any(w in n for w in words):
                     return role
