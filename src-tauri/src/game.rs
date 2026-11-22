@@ -11,6 +11,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
+use crate::diag::Diag;
+
 #[derive(Serialize, Clone, PartialEq, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Reading {
@@ -20,6 +22,8 @@ pub struct Reading {
     champion: Option<String>,
     /// the champion's numeric key (36), from the client
     champion_key: Option<i64>,
+    /// the tray's test mode is on: "in-game" with the last champion seen, so a screenshot of a pick can be read
+    test: bool,
 }
 
 fn agent() -> ureq::Agent {
@@ -80,7 +84,7 @@ fn in_game(agent: &ureq::Agent) -> Option<Reading> {
         .and_then(|p| p.get("rawChampionName")?.as_str())
         .and_then(|raw| raw.strip_prefix("game_character_displayname_"))
         .map(str::to_string);
-    Some(Reading { phase: "in-game", champion, champion_key: None })
+    Some(Reading { phase: "in-game", champion, champion_key: None, test: false })
 }
 
 /// In champ select: the champion in the player's own cell (ARAM gives one; a pick intent counts while hovering).
@@ -92,7 +96,7 @@ fn champ_select(agent: &ureq::Agent, c: &Client) -> Option<Reading> {
         .iter()
         .filter_map(|k| me.get(*k).and_then(Value::as_i64))
         .find(|&k| k > 0);
-    Some(Reading { phase: "champ-select", champion: None, champion_key: key })
+    Some(Reading { phase: "champ-select", champion: None, champion_key: key, test: false })
 }
 
 fn read(agent: &ureq::Agent) -> Reading {
@@ -111,15 +115,28 @@ fn read(agent: &ureq::Agent) -> Reading {
 }
 
 /// `in_game` is set while the game's Live Client Data API answers: the card reader looks at the screen only then.
-pub fn spawn(app: AppHandle, in_game: Arc<std::sync::atomic::AtomicBool>) {
+pub fn spawn(app: AppHandle, in_game: Arc<std::sync::atomic::AtomicBool>, diag: Arc<Diag>) {
     thread::spawn(move || {
         let agent = agent();
         let mut last: Option<Reading> = None;
         let mut sent = Instant::now();
+        let mut seen = Reading::default(); // the last champion read, for the test mode
         loop {
-            let now = read(&agent);
+            let mut now = read(&agent);
             let idle = now.phase == "idle";
             in_game.store(now.phase == "in-game", std::sync::atomic::Ordering::Relaxed);
+            if now.champion.is_some() || now.champion_key.is_some() {
+                seen = now.clone();
+            }
+            if idle && diag.test() {
+                now = Reading { phase: "in-game", test: true, ..seen.clone() };
+            }
+            if last.as_ref() != Some(&now) {
+                diag.log(&format!("game: {} · champion {} · key {}{}", now.phase,
+                    now.champion.as_deref().unwrap_or("none"),
+                    now.champion_key.map_or("none".into(), |k| k.to_string()),
+                    if now.test { " · test mode" } else { "" }));
+            }
             if last.as_ref() != Some(&now) || sent.elapsed() > Duration::from_secs(5) {
                 let _ = app.emit("game-reading", now.clone());
                 last = Some(now);

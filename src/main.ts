@@ -1,7 +1,7 @@
 // Starts the overlay. In the app (Tauri) Rust sends "game-reading" (phase and champion), "pick" (the augment cards the
 // reader sees: their names and where they sit) and "pointer" (Shift and the cursor),
 // and the window lets clicks through except over the overlay's own controls (their rects go to Rust as hit regions).
-// The augment cards are not read yet (screen capture is the next step), so in the app the overlay shows in champ select. In a browser it shows a sample
+// In a browser it shows a sample
 // (?sample=mundo | kaisa | unknown, with &open=settings | list or &shift=<card>) over a drawn game screen.
 
 import dataJson from "./data/game-data.json";
@@ -14,6 +14,7 @@ const data = dataJson as unknown as GameData;
 const inApp = "__TAURI_INTERNALS__" in window;
 const stage = document.getElementById("stage")!;
 const KEY = "oblivion-orb.settings";
+const LAST_CHAMP = "oblivion-orb.last-champion";
 
 function loadSettings(): Settings {
   try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }; } catch { return { ...DEFAULT_SETTINGS }; }
@@ -76,7 +77,7 @@ function setState(next: GameState) {
   state = next; draw();
 }
 
-interface Reading { phase: "idle" | "champ-select" | "in-game"; champion: string | null; championKey: number | null }
+interface Reading { phase: "idle" | "champ-select" | "in-game"; champion: string | null; championKey: number | null; test: boolean }
 interface Pointer { shift: boolean; x: number; y: number }
 interface PickCard { name: string; card: Rect; reroll: Rect | null }
 interface Pick { open: boolean; cards: PickCard[] }
@@ -89,7 +90,11 @@ if (inApp) {
   void (async () => {
     const { listen } = await import("@tauri-apps/api/event");
     await listen<Reading>("game-reading", ({ payload: r }) => {
-      const champion = r.champion ?? (r.championKey != null ? byKey.get(r.championKey) ?? null : null);
+      let champion = r.champion ?? (r.championKey != null ? byKey.get(r.championKey) ?? null : null);
+      // the test mode with no champion seen since the app started: the last one from an earlier run, else the sample's
+      if (champion) localStorage.setItem(LAST_CHAMP, champion);
+      else if (r.test) champion = localStorage.getItem(LAST_CHAMP) ?? "DrMundo";
+      ui.test = r.test;
       // the offers stay as they are until the card reader sends them
       setState({ ...state, phase: state.phase === "augment-pick" && r.phase === "in-game" ? state.phase : r.phase, champion });
     });

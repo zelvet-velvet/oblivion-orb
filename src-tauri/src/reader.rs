@@ -5,7 +5,8 @@
 // the capture, so the overlay never reads itself.
 //
 // Positions follow the game's pick screen at 1920 × 1080 (measured on real screenshots), scaled by the screen's height
-// and centred, which is how the game lays out its UI.
+// and centred, which is how the game lays out its UI. A pick offers three cards, or four (Jhin's band, for one): the
+// cards are always 320 wide, 48 apart and centred, so the reader tries each count in LAYOUTS.
 
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -13,6 +14,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
+
+use crate::diag::Diag;
 
 #[derive(Serialize, Clone, Copy, PartialEq, Debug)]
 pub struct Rect {
@@ -37,7 +40,8 @@ pub struct Pick {
 }
 
 // the pick screen at 1920 × 1080
-const CARD_X: [f64; 3] = [433.0, 801.0, 1169.0];
+const LAYOUTS: [usize; 2] = [4, 3]; // card counts, most first: the middle cards of four never look like three
+const CARD_GAP: f64 = 48.0;
 const CARD_Y: f64 = 193.0;
 const CARD_W: f64 = 320.0;
 const CARD_H: f64 = 526.0;
@@ -48,6 +52,12 @@ const REROLL_H: f64 = 40.0;
 const NAME_Y: f64 = 392.0; // the name line: 280 × 80 round the card's centre
 const NAME_W: f64 = 280.0;
 const NAME_H: f64 = 80.0;
+
+/// The cards' left edges for a pick of n cards (three: 432, 800, 1168).
+fn card_xs(n: usize) -> Vec<f64> {
+    let first = 960.0 - (n as f64 * CARD_W + (n as f64 - 1.0) * CARD_GAP) / 2.0;
+    (0..n).map(|i| first + i as f64 * (CARD_W + CARD_GAP)).collect()
+}
 
 /// A copy of part of the screen, BGRA, top-down.
 struct Shot {
@@ -213,34 +223,44 @@ fn differs(a: &[f32], b: &[f32]) -> bool {
 }
 
 /// Keep our own window out of screen captures (Windows 10 2004 and later), so the reader never sees the overlay.
-pub fn exclude_from_capture(app: &AppHandle) {
+pub fn exclude_from_capture(app: &AppHandle, diag: &Diag) {
     #[cfg(windows)]
     if let Some(win) = app.get_webview_window("main") {
         if let Ok(h) = win.hwnd() {
             use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE};
-            unsafe {
-                SetWindowDisplayAffinity(h.0 as _, WDA_EXCLUDEFROMCAPTURE);
-            }
+            let ok = unsafe { SetWindowDisplayAffinity(h.0 as _, WDA_EXCLUDEFROMCAPTURE) } != 0;
+            diag.log(if ok { "overlay kept out of the capture" } else { "could not keep the overlay out of the capture (Windows older than 10 2004?)" });
         }
     }
     #[cfg(not(windows))]
-    let _ = app;
+    let _ = (app, diag);
 }
 
-pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>) {
+pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
     thread::spawn(move || {
         let ocr = Ocr::new();
-        let mut open = false;
-        let mut sigs: Vec<Vec<f32>> = vec![Vec::new(); 3];
-        let mut names: Vec<String> = vec![String::new(); 3];
+        diag.log(if ocr.is_some() {
+            "ocr: Traditional Chinese ready"
+        } else {
+            "ocr: NOT available: add 中文(繁體，台灣) in Windows Settings > Time & language > Language & region, with its optical character recognition feature; the cards cannot be named until then"
+        });
+        let mut open: Option<usize> = None; // the card count of the open pick
+        let mut sigs: Vec<Vec<f32>> = Vec::new();
+        let mut names: Vec<String> = Vec::new();
         let mut last: Option<Pick> = None;
         let mut last_sent = Instant::now();
+        let mut last_look = Instant::now() - Duration::from_secs(60); // the "look" line in the log, every 10 s
+        let mut screen_logged = (0.0, 0.0, 0.0);
+        let close = |app: &AppHandle, diag: &Diag, why: &str| {
+            diag.log(&format!("pick closed ({why})"));
+            let _ = app.emit("pick", Pick { open: false, cards: vec![] });
+        };
         loop {
-            thread::sleep(Duration::from_millis(if in_game.load(Ordering::Relaxed) { 250 } else { 1000 }));
-            if !in_game.load(Ordering::Relaxed) {
-                if open {
-                    open = false;
-                    let _ = app.emit("pick", Pick { open: false, cards: vec![] });
+            let reading = in_game.load(Ordering::Relaxed) || diag.test();
+            thread::sleep(Duration::from_millis(if reading { 250 } else { 1000 }));
+            if !reading {
+                if open.take().is_some() {
+                    close(&app, &diag, "the game is over");
                     last = None;
                 }
                 continue;
@@ -249,41 +269,72 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>) {
             let Ok(Some(mon)) = win.primary_monitor() else { continue };
             let (sw, sh) = (mon.size().width as f64, mon.size().height as f64);
             let (mx, my) = (mon.position().x as f64, mon.position().y as f64);
+            let scale = win.scale_factor().unwrap_or(1.0);
+            if screen_logged != (sw, sh, scale) {
+                screen_logged = (sw, sh, scale);
+                diag.log(&format!("screen {sw}x{sh} at ({mx}, {my}), scaling {:.0}%{}", scale * 100.0,
+                    if (sw / sh - 16.0 / 9.0).abs() > 0.02 { ": not 16:9, the card positions may be off" } else { "" }));
+            }
             let k = sh / 1080.0;
             let ox = mx + (sw - 1920.0 * k) / 2.0;
             let px = |v: f64| (ox + v * k).round() as i32;
             let py = |v: f64| (my + v * k).round() as i32;
-            // one copy round all three cards and their buttons
-            let (x0, y0) = (px(CARD_X[0]), py(CARD_Y));
-            let (x1, y1) = (px(CARD_X[2] + CARD_W), py(REROLL_Y + REROLL_H + 4.0));
-            let Some(shot) = capture(x0, y0, x1 - x0, y1 - y0) else { continue };
+            // one copy round the widest pick (four cards) and the buttons
+            let widest = card_xs(LAYOUTS[0]);
+            let (x0, y0) = (px(widest[0]), py(CARD_Y));
+            let (x1, y1) = (px(widest[widest.len() - 1] + CARD_W), py(REROLL_Y + REROLL_H + 4.0));
+            let Some(shot) = capture(x0, y0, x1 - x0, y1 - y0) else {
+                if last_look.elapsed() > Duration::from_secs(10) {
+                    last_look = Instant::now();
+                    diag.log("screen capture failed");
+                }
+                continue;
+            };
 
-            let scores: Vec<f32> = CARD_X.iter().map(|&cx| {
+            let frame = |cx: f64| {
                 let (l, r) = (px(cx), px(cx + CARD_W));
                 let (ya, yb) = (py(CARD_Y + 80.0), py(CARD_Y + 460.0));
                 let step = (20.0 * k).max(4.0) as usize;
                 let o = |v: f64| (v * k).round() as i32;
                 edge(&shot, l + o(8.0), l + o(26.0), ya, yb, step).min(edge(&shot, r - o(9.0), r - o(27.0), ya, yb, step))
-            }).collect();
-            // opens when all three frames are there; stays open while two are (the game's tooltip may cover one)
-            let seen = scores.iter().filter(|&&s| s >= 0.4).count();
-            let now_open = if open { seen >= 2 } else { seen == 3 };
-            if !now_open {
-                if open {
-                    open = false;
-                    sigs = vec![Vec::new(); 3];
-                    names = vec![String::new(); 3];
-                    let _ = app.emit("pick", Pick { open: false, cards: vec![] });
+            };
+            let scores: Vec<(usize, Vec<f32>)> = LAYOUTS.iter().map(|&n| (n, card_xs(n).into_iter().map(frame).collect())).collect();
+            let seen = |n: usize| scores.iter().find(|s| s.0 == n).map_or(0, |s| s.1.iter().filter(|&&v| v >= 0.4).count());
+            if last_look.elapsed() > Duration::from_secs(10) {
+                last_look = Instant::now();
+                let parts: Vec<String> = scores.iter().map(|(n, v)| {
+                    format!("{n} cards [{}]", v.iter().map(|x| format!("{x:.2}")).collect::<Vec<_>>().join(" "))
+                }).collect();
+                diag.log(&format!("look: frames {} (a pick opens when every card of a count is 0.40 or more){}",
+                    parts.join(", "), if diag.test() { " · test mode" } else { "" }));
+                if diag.test() && open.is_none() {
+                    diag.save_bmp("test-capture.bmp", shot.w, shot.h, &shot.px);
+                }
+            }
+            // opens when every frame of a count is there; stays open while all but one are (the tooltip may cover one)
+            let now_open = match open {
+                Some(n) if seen(n) + 1 >= n => Some(n),
+                Some(_) => None,
+                None => LAYOUTS.iter().copied().find(|&n| seen(n) == n),
+            };
+            if now_open != open {
+                if open.is_some() {
+                    close(&app, &diag, "the frames are gone");
                     last = None;
                 }
-                continue;
+                if let Some(n) = now_open {
+                    diag.log(&format!("pick open: {n} cards"));
+                    diag.save_bmp("pick-capture.bmp", shot.w, shot.h, &shot.px);
+                    sigs = vec![Vec::new(); n];
+                    names = vec![String::new(); n];
+                }
+                open = now_open;
             }
-            open = true;
+            let Some(n) = open else { continue };
 
-            let scale = win.scale_factor().unwrap_or(1.0);
             let css = |r: Rect| Rect { x: (r.x - mx) / scale, y: (r.y - my) / scale, w: r.w / scale, h: r.h / scale };
-            let mut cards = Vec::with_capacity(3);
-            for (i, &cx) in CARD_X.iter().enumerate() {
+            let mut cards = Vec::with_capacity(n);
+            for (i, cx) in card_xs(n).into_iter().enumerate() {
                 let card = Rect { x: ox + cx * k, y: my + CARD_Y * k, w: CARD_W * k, h: CARD_H * k };
                 let rr = Rect { x: ox + (cx + REROLL_DX) * k, y: my + REROLL_Y * k, w: REROLL_W * k, h: REROLL_H * k };
                 let mid = px(cx + CARD_W / 2.0);
@@ -292,6 +343,7 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>) {
                     if let Some(o) = &ocr {
                         let (img, w, h) = shot.crop(px(cx + CARD_W / 2.0 - NAME_W / 2.0), py(NAME_Y), (NAME_W * k) as i32, (NAME_H * k) as i32, 2);
                         let read = o.read(&img, w, h);
+                        diag.log(&format!("card {}: ocr read \"{read}\"", i + 1));
                         if !read.is_empty() {
                             names[i] = read;
                         }
@@ -301,6 +353,13 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>) {
                 cards.push(Card { name: names[i].clone(), card: css(card), reroll: reroll_usable(&shot, rr).then(|| css(rr)) });
             }
             let pick = Pick { open: true, cards };
+            let gist = |p: &Pick| p.cards.iter().map(|c| (c.name.clone(), c.reroll.is_some())).collect::<Vec<_>>();
+            if last.as_ref().map(gist) != Some(gist(&pick)) {
+                let line: Vec<String> = pick.cards.iter().map(|c| {
+                    format!("\"{}\"{}", c.name, if c.reroll.is_some() { " (reroll usable)" } else { "" })
+                }).collect();
+                diag.log(&format!("cards: {}", line.join(", ")));
+            }
             if last.as_ref() != Some(&pick) || last_sent.elapsed() > Duration::from_secs(3) {
                 let _ = app.emit("pick", pick.clone());
                 last = Some(pick);

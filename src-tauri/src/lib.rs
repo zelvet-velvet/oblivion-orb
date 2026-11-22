@@ -2,11 +2,13 @@
 // overlay's own controls, a tray icon to quit, and two readers: the game (the client's local APIs) and the pointer.
 // It never reads or writes the game's memory and never clicks for the player.
 
+mod diag;
 mod game;
 mod pointer;
 mod reader;
 
-use tauri::menu::{Menu, MenuItem};
+use std::sync::Arc;
+use tauri::menu::{CheckMenuItem, Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 
@@ -23,11 +25,26 @@ pub fn run() {
             }
             win.set_ignore_cursor_events(true)?;
 
+            let dir = app.path().app_log_dir().unwrap_or_else(|_| std::env::temp_dir().join("oblivion-orb"));
+            let diag = Arc::new(diag::Diag::new(dir));
+            diag.log(&format!("遺忘寶珠 {} started", app.package_info().version));
+
+            let test = CheckMenuItem::with_id(app, "test", "測試模式（不用進遊戲）", true, false, None::<&str>)?;
+            let logs = MenuItem::with_id(app, "logs", "開啟記錄資料夾", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "結束遺忘寶珠", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit])?;
-            let mut tray = TrayIconBuilder::new().tooltip("遺忘寶珠").menu(&menu).on_menu_event(|app, e| {
-                if e.id.as_ref() == "quit" {
-                    app.exit(0);
+            let menu = Menu::with_items(app, &[&test, &logs, &quit])?;
+            let d = diag.clone();
+            let mut tray = TrayIconBuilder::new().tooltip("遺忘寶珠").menu(&menu).on_menu_event(move |app, e| {
+                match e.id.as_ref() {
+                    "test" => {
+                        let on = d.toggle_test();
+                        let _ = test.set_checked(on);
+                    }
+                    "logs" => {
+                        let _ = std::process::Command::new("explorer").arg(&d.dir).spawn();
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
                 }
             });
             if let Some(icon) = app.default_window_icon() {
@@ -35,11 +52,11 @@ pub fn run() {
             }
             tray.build(app)?;
 
-            reader::exclude_from_capture(app.handle());
-            let in_game = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            reader::exclude_from_capture(app.handle(), &diag);
+            let in_game = Arc::new(std::sync::atomic::AtomicBool::new(false));
             pointer::spawn(app.handle().clone());
-            game::spawn(app.handle().clone(), in_game.clone());
-            reader::spawn(app.handle().clone(), in_game);
+            game::spawn(app.handle().clone(), in_game.clone(), diag.clone());
+            reader::spawn(app.handle().clone(), in_game, diag);
             Ok(())
         })
         .run(tauri::generate_context!())

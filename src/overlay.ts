@@ -9,7 +9,7 @@ import {
 import { rankOffers, shortWhy, styleOf, type Verdict } from "./rank";
 import type { ChampionData, CoreItem, GameData, GameState, Mode, Offer, Settings, Tier } from "./types";
 
-export interface UiState { settingsOpen: boolean }
+export interface UiState { settingsOpen: boolean; test?: boolean }
 export interface View { data: GameData; state: GameState; settings: Settings; ui: UiState }
 export type Action =
   | { type: "pick-style"; key: string } | { type: "mode"; mode: Mode }
@@ -17,8 +17,13 @@ export type Action =
 
 const MODE_LINE: Record<Mode, string> = { 貪: "貪：上限高、要慢慢疊的往前", 均衡: "均衡：穩的和上限高的各半", 穩: "穩：先拿馬上有效的" };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const box = (x: number, y: number, w: number, h: number, cls = "", attrs = "") =>
-  `<div class="abs ${cls}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px" ${attrs}>`;
+const box = (x: number, y: number, w: number, h: number, cls = "", attrs = "", style = "") =>
+  `<div class="abs ${cls}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;${style}" ${attrs}>`;
+/** A side panel w wide in `room` pixels: its scale (1, or less when four cards leave too little room) and that style. */
+function fitIn(room: number, w: number): [number, string] {
+  const k = Math.max(0.5, Math.min(1, room / w));
+  return [k, k < 1 ? `transform:scale(${k.toFixed(3)});transform-origin:0 0` : ""];
+}
 
 /** Where the cards are: the default pick layout when the reader has not sent any (champ select). */
 const DEFAULT_CARDS = { left: 433, right: 1489, top: 193, bottom: 719 };
@@ -37,12 +42,13 @@ export function verdicts(v: View): Verdict[] {
 function leftPanel(v: View, champ: ChampionData, span: Span): string {
   const style = styleOf(v.data, v.state.champion, v.settings.styleKey);
   const styles = champ.styles.slice(0, 4), rows = Math.ceil(styles.length / 2);   // up to four builds, two per row
-  const W = 320, P = 14, TH = 128, GAP = 10, X = span.left - 20 - W;
+  const W = 320, P = 14, TH = 128, GAP = 10;
+  const [k, fit] = fitIn(span.left - 28, W), X = Math.round(span.left - 16 - W * k);
   const tilesH = rows * TH + (rows - 1) * GAP;
   const H = 68 + tilesH + 10 + 20 + 16 + 26 + 40 + 20;
-  const Y = Math.max(344, Math.round((span.top + span.bottom) / 2 - H / 2));
+  const Y = Math.max(k < 1 ? 200 : 344, Math.round((span.top + span.bottom) / 2 - H * k / 2));
   const half = Math.floor((W - 2 * P - GAP) / 2);
-  let s = box(X, Y, W, H, "plate") + plate(W, H)
+  let s = box(X, Y, W, H, "plate", "", fit) + plate(W, H)
     + `<div class="abs panel-title" style="left:${P}px">玩法</div>`
     + `<button class="abs gear" style="left:${W - P - 36}px;top:16px" data-act="open-settings" data-hit aria-label="建議邏輯">${plate(36, 36)}${gear(22)}</button>`;
   styles.forEach((st, k) => {
@@ -69,11 +75,12 @@ function leftPanel(v: View, champ: ChampionData, span: Span): string {
 
 // ---- right: the champion (the knowledge) ----
 function rightPanel(champ: ChampionData, core: CoreItem[], span: Span): string {
-  const W = 360, P = 24, X = span.right + 23;
+  const W = 360, P = 24;
+  const [k, fit] = fitIn(1920 - 12 - span.right - 16, W), X = span.right + 16;
   const playH = champ.play.length ? champ.play.length * 56 + (champ.play.length - 1) * 14 : 0;
   const H = 78 + (champ.play.length ? 30 + playH + 28 : 0) + (core.length ? 30 + 88 + 24 : 0) + 22 + 22;
-  const Y = Math.round((span.top + span.bottom) / 2 - H / 2);
-  let s = box(X, Y, W, H, "plate") + plate(W, H) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
+  const Y = Math.round((span.top + span.bottom) / 2 - H * k / 2);
+  let s = box(X, Y, W, H, "plate", "", fit) + plate(W, H) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
   let y = 78;
   if (champ.play.length) {
     s += `<div class="abs label" style="left:${P}px;top:${y}px">怎麼玩</div>`; y += 30;
@@ -183,5 +190,6 @@ export function render(root: HTMLElement, v: View): void {
     if (st.hover != null && vds[st.hover]) html += banner(v, vds[st.hover]);
   }
   if (v.ui.settingsOpen) html += settingsPanel(v.settings);
+  if (v.ui.test) html += `<div class="abs test-badge">測試模式 · 從系統匣關閉</div>`;
   root.innerHTML = html;
 }

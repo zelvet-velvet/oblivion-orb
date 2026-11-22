@@ -4,7 +4,7 @@ A PC overlay for League of Legends' **ARAM Mayhem**. When the augment cards show
 
 Sibling of [Morellonomicon (黑魔禁書)](https://github.com/zelvet-velvet/Morellonomicon), the Traditional Chinese beginner guide whose augment tiers and reasoning it uses. The name is one of the items Morellonomicon builds from.
 
-**Status**: early. The overlay's look, the ranking and the app shell work; the app shows the play-style panel in champ select. Reading the augment cards from the screen comes next, so the verdicts under the cards show only in the browser samples for now.
+**Status**: early. The overlay's look, the ranking and the app shell work; the app shows the play-style panel in champ select and reads the augment cards from the screen (three or four), still being tested in real games.
 
 ## What it shows
 - **Play styles** on the left: pick one (Dr. Mundo: Q 消耗 · 穿透, 坦克, 坦克輸出) and the ranking follows it.
@@ -22,7 +22,7 @@ The data comes from [Morellonomicon](https://github.com/zelvet-velvet/Morellonom
 npm install
 npm run data      # src/data/game-data.json from ../Morellonomicon (tiers, reasons; no win rates)
 npm test          # the ranking
-npm run dev       # the overlay in a browser: http://localhost:1420/?sample=mundo (also kaisa, unknown)
+npm run dev       # the overlay in a browser: http://localhost:1420/?sample=mundo (also kaisa, ahri, jhin, unknown)
 ```
 
 In the browser, hold **Shift** over a card for the note; the play-style panel, the mode and 設定 work.
@@ -45,6 +45,11 @@ npm run tauri build   # an installer in src-tauri/target/release/bundle/nsis
 ```
 
 Run the game in borderless mode: an overlay cannot sit over exclusive fullscreen.
+
+### Testing the card reader
+- **Without a game**: tray icon › 測試模式（不用進遊戲）. The reader runs as if a game were on, with the last champion seen (a red 測試模式 badge shows it is on). Open a screenshot of a pick screen full screen (Photos, F11) on the main screen: the plates should appear on its cards.
+- **The log**: tray icon › 開啟記錄資料夾 (`%LOCALAPPDATA%\com.zelvet.oblivionorb\logs`). `reader.log` holds the game reading, whether the Traditional Chinese OCR is installed, the screen size, every 10 s how much each card frame looks present (`look:`; a pick opens when every card of a count is 0.40 or more), what the OCR read on each card, and the cards it sent. `pick-capture.bmp` is the card area when a pick opened; `test-capture.bmp` the area the reader sees in test mode. The previous run's log is `reader.old.log`.
+- A pick offers three cards, or four (Jhin's band); both layouts are read.
 
 ## Rules it keeps
 - No augment win rates (Riot's developer policy); tiers and reasons only.

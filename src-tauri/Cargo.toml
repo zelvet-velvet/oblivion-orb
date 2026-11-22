@@ -25,6 +25,6 @@ base64 = "0.22"
 [target.'cfg(windows)'.dependencies]
 # Shift held, read the way any hotkey app does (no game memory); the card areas of the screen (GDI); our window kept out
 # of our own capture
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_System_SystemInformation"] }
 # Windows' own OCR (Windows.Media.Ocr) for the card names
 windows = { version = "0.62", features = ["Media_Ocr", "Graphics_Imaging", "Globalization", "Storage_Streams", "Foundation", "Win32_System_WinRT"] }

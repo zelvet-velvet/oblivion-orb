@@ -7,7 +7,7 @@ import type { GameData, GameState, Offer } from "./types";
 const CARD = { y: 193, w: 320, h: 526 }, REROLL = { y: 743, w: 68, h: 40 };
 export const sampleOffers = (ids: (number | null)[]): Offer[] =>
   ids.map((id, k) => {
-    const x = 433 + k * 368;
+    const x = 960 - (ids.length * 368 - 48) / 2 + k * 368;   // centred: three from 432, four (Jhin's band) from 248
     return { id, card: { x, ...CARD }, reroll: { x: x + (CARD.w - REROLL.w) / 2 + 3, ...REROLL } };
   });
 
@@ -20,6 +20,9 @@ export const SAMPLES: Record<string, { state: GameState }> = {
   },
   ahri: {   // four play styles
     state: { phase: "augment-pick", champion: "Ahri", round: "金", offers: sampleOffers([1013, 1015, 3132]), shift: false, hover: null },
+  },
+  jhin: {   // four cards (Jhin's band): the side panels shrink to fit
+    state: { phase: "augment-pick", champion: "Jhin", round: "稜鏡", offers: sampleOffers([1048, 1349, 2098, 2099]), shift: false, hover: null },
   },
   unknown: {   // a card not read yet and a pick with no reroll left
     state: { phase: "augment-pick", champion: "DrMundo", round: "金",
