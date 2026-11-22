@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { panelsOpen, tileStyles } from "./overlay";
+import { panelsOpen } from "./overlay";
+import { groupStyles, groupWarn } from "./styles";
 import type { GameState, StyleData } from "./types";
 
 const base: GameState = { phase: "in-game", champion: "Ekko", round: null, offers: [], shift: false, hover: null };
@@ -21,12 +22,18 @@ describe("panelsOpen", () => {
   });
 });
 
-describe("tileStyles", () => {
-  const sty = (key: string): StyleData => ({ key, name: key, role: "mage", damage: "magic", core: [], tierKey: "main" });
-  const all = ["0", "1", "2", "3", "4", "5"].map(sty);
-  it("the four most played; a chosen style from 更多玩法 takes the last tile", () => {
-    expect(tileStyles(all, all[1]).map((s) => s.key)).toEqual(["0", "1", "2", "3"]);
-    expect(tileStyles(all, all[5]).map((s) => s.key)).toEqual(["0", "1", "2", "5"]);
-    expect(tileStyles(all.slice(0, 2), null).map((s) => s.key)).toEqual(["0", "1"]);
+describe("groupStyles", () => {
+  const sty = (key: string, role: StyleData["role"], damage: StyleData["damage"], warn: StyleData["warn"] = ""): StyleData =>
+    ({ key, name: key, role, damage, core: [], tierKey: "main", warn });
+  const all = [sty("海妖特效", "marksman", "phys"), sty("魔法彎刀戰士", "fighter", "phys"), sty("AD 特效", "marksman", "phys"),
+               sty("AP 刺客", "assassin", "magic", "few"), sty("爆發法師", "mage", "magic", "weak")];
+  it("one group per role and damage, in the order of its most played build; rare builds stay", () => {
+    const g = groupStyles(all);
+    expect(g.map((x) => x.label)).toEqual(["AD 射手", "AD 戰士", "AP 刺客", "AP 法師"]);
+    expect(g[0].styles.map((s) => s.key)).toEqual(["海妖特效", "AD 特效"]);
+  });
+  it("a group is marked only when all its builds are unsure", () => {
+    const g = groupStyles(all);
+    expect(g.map(groupWarn)).toEqual(["", "", "few", "weak"]);
   });
 });

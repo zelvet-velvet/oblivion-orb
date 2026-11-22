@@ -4,15 +4,15 @@
 
 import {
   DIM, EMBER_TXT, METAL, VERDICT_INK, WHY_INK, TEAL, GOLD,
-  gear, hextechFrame, plate, plateGlow, rarityPlate, rerollTag, richApAd, roleIcon, dmgPill, tile, toggle,
+  gear, hextechFrame, plate, plateGlow, rarityPlate, rerollTag, richApAd, roleIcon, tile, toggle,
 } from "./art";
 import { endDraw, FADE, FLIP, imageOk, loaded, motion } from "./motion";
 import { rankOffers, shortWhy, styleOf, type Verdict } from "./rank";
+import { groupStyles, groupWarn } from "./styles";
 import type { ChampionData, CoreItem, GameData, GameState, Mode, Offer, Settings, StyleData, Tier } from "./types";
 
 export interface UiState {
   settingsOpen: boolean; test?: boolean; fullscreen?: boolean;
-  moreOpen?: boolean;         // the 更多玩法 list
   /** the toggle button's choice in game: open or closed; null follows the game (open at a pick and in the shop) */
   panels?: "open" | "closed" | null;
 }
@@ -28,10 +28,10 @@ export const autoOpen = (st: GameState) => (st.phase === "augment-pick" && st.of
 export interface View { data: GameData; state: GameState; settings: Settings; ui: UiState; redraw?: () => void }
 export type Action =
   | { type: "pick-style"; key: string } | { type: "mode"; mode: Mode }
-  | { type: "open-settings" } | { type: "close-settings" } | { type: "setting"; key: keyof Settings; value: unknown }
-  | { type: "open-more" } | { type: "close-more" };
+  | { type: "open-settings" } | { type: "close-settings" } | { type: "setting"; key: keyof Settings; value: unknown };
 
-/** A style whose result is not sure, in words (never a number): few games behind it, or it loses. */
+/** A style whose result is not sure, in words (never a number): few games behind it, or it loses. It is still shown: a rare
+ * build the kit supports (Bel'Veth's W scales with AP) is a real choice. */
 export const WARN: Record<string, [string, string]> = {
   few: ["少見", "玩的人少，強弱還不準"], weak: ["偏弱", "照這樣出的人贏得比較少"],
 };
@@ -47,13 +47,7 @@ function fitIn(room: number, w: number, size = 1): [number, string] {
   return [k, k !== 1 ? `transform:scale(${k.toFixed(3)});transform-origin:0 0` : ""];
 }
 
-/** The four styles shown as tiles: the most played, with the chosen one in the last tile when it is not among them. */
-export function tileStyles(styles: StyleData[], chosen: StyleData | null): StyleData[] {
-  const top = styles.slice(0, 4);
-  if (chosen && !top.includes(chosen) && top.length === 4) top[3] = chosen;
-  return top;
-}
-const warnTag = (st: StyleData) => st.warn && WARN[st.warn] ? `<span class="warn" title="${WARN[st.warn][1]}">${WARN[st.warn][0]}</span>` : "";
+const warnTag = (w: string | undefined) => w && WARN[w] ? `<span class="warn" title="${WARN[w][1]}">${WARN[w][0]}</span>` : "";
 
 /** Where the cards are: the default pick layout when the reader has not sent any (champ select). */
 const DEFAULT_CARDS = { left: 433, right: 1489, top: 193, bottom: 719 };
@@ -83,54 +77,72 @@ const dragHandle = (key: "left" | "right", w: number) =>
   `<div class="abs drag" style="left:0;top:0;width:${w}px;height:60px" data-drag="${key}" data-hit title="拖曳移動，按兩下回到原位"></div>`;
 
 // ---- left: 玩法 (the choice) ----
+// Two levels: the role and damage (AP 刺客, AD 戰士) as tiles, the choice that moves the augment ranking; under it that group's
+// builds, rare and losing ones marked. The chosen build's items are on the right.
+const BUILD_H = 38, BUILD_GAP = 6;
 function leftPanel(v: View, champ: ChampionData, span: Span): string {
   const style = styleOf(v.data, v.state.champion, v.settings.styleKey);
-  const styles = tileStyles(champ.styles, style), rows = Math.ceil(styles.length / 2);   // four builds, two per row
-  const more = champ.styles.length > 4;
-  const W = 320, P = 14, TH = 128, GAP = 10;
+  const groups = groupStyles(champ.styles), group = groups.find((g) => style && g.styles.includes(style)) ?? groups[0];
+  const W = 320, P = 14, TH = 64, GAP = 8, inner = W - 2 * P, half = Math.floor((inner - GAP) / 2);
+  const tileRows = Math.ceil(groups.length / 2), tilesH = tileRows * TH + (tileRows - 1) * GAP;
+  const builds = group?.styles ?? [], cols = builds.length > 4 ? 2 : 1, buildRows = Math.ceil(builds.length / cols);
+  const buildsY = 68 + tilesH + 16 + 28, buildsH = buildRows * BUILD_H + Math.max(0, buildRows - 1) * BUILD_GAP;
+  const autoY = buildsY + buildsH + 10, modeY = autoY + 20 + 16;
+  const H = modeY + 26 + 40 + 20;
   const [k, fit] = fitIn(span.left - 28, W, v.settings.panelScale), X = Math.round(span.left - 16 - W * k);
-  const tilesH = rows * TH + (rows - 1) * GAP + (more ? GAP + 36 : 0);
-  const H = 68 + tilesH + 10 + 20 + 16 + 26 + 40 + 20;
   const [dx, dy] = v.settings.panelOffsets.left ?? [0, 0];
-  const Y = Math.max(k < 1 ? 200 : 344, Math.round((span.top + span.bottom) / 2 - H * k / 2)) + dy;
-  const half = Math.floor((W - 2 * P - GAP) / 2);
+  const Y = Math.max(k < 1 ? 200 : 120, Math.round((span.top + span.bottom) / 2 - H * k / 2)) + dy;
   let s = box(X + dx, Y, W, H, "plate", "", fit + ";" + motion("left", "fade", FADE)) + plate(W, H) + dragHandle("left", W - P - 36 - 8)
     + `<div class="abs panel-title" style="left:${P}px">玩法</div>`
     + `<button class="abs gear" style="left:${W - P - 36}px;top:16px" data-act="open-settings" data-hit aria-label="建議邏輯">${plate(36, 36)}${gear(22)}</button>`;
-  styles.forEach((st, k) => {
-    const on = st.key === style?.key, auto = on && v.settings.styleKey == null;
-    // a lone tile on its row (one style, or the third of three) spans the row
-    const tw = styles.length === 1 || (k === styles.length - 1 && k % 2 === 0) ? W - 2 * P : half;
-    const tx = P + (k % 2) * (half + GAP), ty = 68 + Math.floor(k / 2) * (TH + GAP);
-    s += `<button class="abs tile${on ? " on" : ""}" style="left:${tx}px;top:${ty}px;width:${tw}px;height:${TH}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
+  groups.forEach((g, i) => {
+    const on = g === group;
+    // a lone tile on its row (one group, or the last of an odd number) spans the row
+    const tw = groups.length === 1 || (i === groups.length - 1 && i % 2 === 0) ? inner : half;
+    const tx = P + (i % 2) * (half + GAP), ty = 68 + Math.floor(i / 2) * (TH + GAP);
+    // a tap picks the group's most played build
+    s += `<button class="abs group${on ? " on" : ""}" style="left:${tx}px;top:${ty}px;width:${tw}px;height:${TH}px" data-act="pick-style" data-key="${esc(g.styles[0].key)}" data-hit>`
       + plate(tw, TH, on ? TEAL : GOLD, on ? 0.9 : 0.65)
-      + (auto ? `<span class="auto">自動</span>` : "") + warnTag(st)
-      + `<span class="role">${roleIcon(st.role, 40, on ? "#F0E6D2" : DIM)}</span>`
-      + `<span class="tile-name">${esc(st.name)}</span>${dmgPill(st.damage)}</button>`;
+      + `<span class="role">${roleIcon(g.role, 30, on ? "#F0E6D2" : DIM)}</span>`
+      + `<span class="group-words"><span class="group-name">${esc(g.label)}</span><span class="group-n">${g.styles.length} 種出裝${warnTag(groupWarn(g))}</span></span></button>`;
   });
-  if (more) {   // the rest of the champion's styles, in a list
-    const my = 68 + rows * TH + (rows - 1) * GAP + GAP;
-    s += `<button class="abs more" style="left:${P}px;top:${my}px;width:${W - 2 * P}px;height:36px" data-act="open-more" data-hit>`
-      + plate(W - 2 * P, 36, GOLD, 0.65) + `<span>更多玩法（全部 ${champ.styles.length} 種）</span></button>`;
+  if (group) {
+    s += `<div class="abs label" style="left:${P}px;top:${68 + tilesH + 16}px">${esc(group.label)}的出裝</div>`;
+    const bw = cols === 2 ? half : inner;
+    builds.forEach((st, i) => {
+      const on = st === style, auto = on && v.settings.styleKey == null;
+      const bx = P + (i % cols) * (half + GAP), by = buildsY + Math.floor(i / cols) * (BUILD_H + BUILD_GAP);   // row by row
+      s += `<button class="abs build${on ? " on" : ""}" style="left:${bx}px;top:${by}px;width:${bw}px;height:${BUILD_H}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
+        + plate(bw, BUILD_H, on ? TEAL : GOLD, on ? 0.9 : 0.4)
+        + `<span class="build-name">${esc(st.name)}</span>${auto ? `<span class="auto">自動</span>` : ""}${warnTag(st.warn)}</button>`;
+    });
   }
-  s += `<div class="abs auto-line" style="left:${P}px;top:${68 + tilesH + 10}px;width:${W - 2 * P}px">依你選的強化和裝備自動選，點一下可改</div>`;
-  const my = 68 + tilesH + 10 + 20 + 16, cw = Math.floor((W - 2 * P - 12) / 3);
-  s += `<div class="abs label" style="left:${P}px;top:${my}px">我要</div>`;
+  s += `<div class="abs auto-line" style="left:${P}px;top:${autoY}px;width:${inner}px">依你選的強化和裝備自動選，點一下可改</div>`;
+  const cw = Math.floor((inner - 12) / 3);
+  s += `<div class="abs label" style="left:${P}px;top:${modeY}px">我要</div>`;
   (["貪", "均衡", "穩"] as Mode[]).forEach((m, j) => {
     const on = v.settings.mode === m;
-    s += `<button class="abs chip${on ? " on" : ""}" style="left:${P + j * (cw + 6)}px;top:${my + 26}px;width:${cw}px;height:40px" data-act="mode" data-mode="${m}" data-hit title="${MODE_LINE[m]}">`
+    s += `<button class="abs chip${on ? " on" : ""}" style="left:${P + j * (cw + 6)}px;top:${modeY + 26}px;width:${cw}px;height:40px" data-act="mode" data-mode="${m}" data-hit title="${MODE_LINE[m]}">`
       + plate(cw, 40, on ? TEAL : GOLD, on ? 0.9 : 0.65) + `<span>${m}</span></button>`;
   });
   return s + `</div>`;
 }
 
 // ---- right: the champion (the knowledge) ----
-function rightPanel(champ: ChampionData, core: CoreItem[], span: Span, offset: [number, number] = [0, 0], size = 1): string {
+/** The chosen build's path, a row each: the core in order, the third item (one of), the boots, the late items. */
+function pathRows(st: StyleData | null): [string, CoreItem[]][] {
+  if (!st) return [];
+  const rows: [string, CoreItem[]][] = [["核心", st.core], ["第三件", st.third ?? []], ["鞋子", st.boots ? [st.boots] : []], ["後期", st.late ?? []]];
+  return rows.filter(([, items]) => items.length);
+}
+const PATH_H = 66, PATH_GAP = 8;
+function rightPanel(champ: ChampionData, style: StyleData | null, span: Span, offset: [number, number] = [0, 0], size = 1): string {
   const W = 360, P = 24;
   const [k, fit] = fitIn(1920 - 12 - span.right - 16, W, size), X = span.right + 16;
   const playH = champ.play.length ? champ.play.length * 56 + (champ.play.length - 1) * 14 : 0;
-  const H = 78 + (champ.play.length ? 30 + playH + 28 : 0) + (core.length ? 30 + 88 + 24 : 0) + 22 + 22;
-  const Y = Math.round((span.top + span.bottom) / 2 - H * k / 2) + offset[1];
+  const path = pathRows(style), pathH = path.length ? path.length * PATH_H + (path.length - 1) * PATH_GAP : 0;
+  const H = 78 + (champ.play.length ? 30 + playH + 28 : 0) + (path.length ? 30 + pathH + 20 : 0) + 22 + 22;
+  const Y = Math.max(12, Math.round((span.top + span.bottom) / 2 - H * k / 2)) + offset[1];
   let s = box(X + offset[0], Y, W, H, "plate", "", fit + ";" + motion("right", "fade", FADE)) + plate(W, H) + dragHandle("right", W) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
   let y = 78;
   if (champ.play.length) {
@@ -144,14 +156,18 @@ function rightPanel(champ: ChampionData, core: CoreItem[], span: Span, offset: [
     s += `<div class="abs rule" style="left:${P}px;top:${y + 14}px;width:${W - 2 * P}px"></div>`;
     y += 28;
   }
-  if (core.length) {
-    s += `<div class="abs label" style="left:${P}px;top:${y}px">核心裝・鞋子</div>`; y += 30;
-    const cw = Math.floor((W - 2 * P) / core.length);
-    core.forEach((it, k) => {
-      s += `<div class="abs core" style="left:${P + k * cw}px;top:${y}px;width:${cw}px">`
-        + (it.icon && imageOk(it.icon) ? `<img src="${esc(it.icon)}" alt="">` : `<i class="core-empty"></i>`) + `<span>${esc(it.name)}</span></div>`;
+  if (path.length && style) {
+    s += `<div class="abs label" style="left:${P}px;top:${y}px">出裝・${esc(style.name)}${warnTag(style.warn).replace('class="warn"', 'class="warn inline"')}</div>`; y += 30;
+    const LW = 56, cw = Math.floor((W - 2 * P - LW) / 3);
+    path.forEach(([label, items], r) => {
+      s += `<div class="abs path-label" style="left:${P}px;top:${y}px;height:${PATH_H}px">${label}${label === "第三件" && items.length > 1 ? "<i>擇一</i>" : ""}</div>`;
+      items.slice(0, 3).forEach((it, j) => {
+        s += `<div class="abs core" style="left:${P + LW + j * cw}px;top:${y}px;width:${cw}px" title="${esc(it.name)}">`
+          + (it.icon && imageOk(it.icon) ? `<img src="${esc(it.icon)}" alt="">` : `<i class="core-empty"></i>`) + `<span>${esc(it.name)}</span></div>`;
+      });
+      y += PATH_H + (r < path.length - 1 ? PATH_GAP : 0);
     });
-    y += 88 + 24;
+    y += 20;
   }
   s += `<div class="abs foot" style="left:${P}px;top:${y}px">按住 Shift 看重點</div>`;
   return s + `</div>`;
@@ -185,30 +201,12 @@ function banner(v: View, vd: Verdict): string {
     + `<div class="abs b-foot">放開 Shift 收起</div></div>`;
 }
 
-/** 更多玩法: every style of the champion, most played first; a tap picks it (it takes the last tile) and closes the list. */
-function moreList(champ: ChampionData, chosen: StyleData | null): string {
-  const W = 560, RH = 52, P = 24, X = 960 - W / 2, Y = 120, n = champ.styles.length;
-  const cols = n > 10 ? 2 : 1, rows = Math.ceil(n / cols), cw = Math.floor((W - 2 * P - (cols - 1) * 10) / cols);
-  const H = 96 + rows * RH + 64;
-  let s = `<div class="abs veil-all" data-act="close-more" data-hit></div>`
-    + box(X, Y, W, H, "plate more-list", "", motion("more", "fade", FADE)) + plate(W, H)
-    + `<div class="abs s-title" style="left:${P}px">更多玩法</div><div class="abs s-sub" style="left:${P}px">玩最多的在前，點一下改用</div>`
-    + `<button class="abs s-close" data-act="close-more" data-hit aria-label="關閉">✕</button>`;
-  champ.styles.forEach((st, i) => {
-    const on = st === chosen, x = P + Math.floor(i / rows) * (cw + 10), y = 96 + (i % rows) * RH;
-    s += `<button class="abs more-row${on ? " on" : ""}" style="left:${x}px;top:${y}px;width:${cw}px;height:${RH - 6}px" data-act="pick-style" data-key="${esc(st.key)}" data-hit>`
-      + `<span class="role">${roleIcon(st.role, 28, on ? "#F0E6D2" : DIM)}</span><span class="more-name">${esc(st.name)}</span>${warnTag(st)}</button>`;
-  });
-  s += `<div class="abs more-foot" style="left:${P}px;top:${96 + rows * RH + 14}px;width:${W - 2 * P}px">少見：${WARN.few[1]}　偏弱：${WARN.weak[1]}</div>`;
-  return s + `</div>`;
-}
-
 function settingsPanel(s: Settings): string {
   const W = 640, X = 960 - W / 2, Y = 196;
   const rows: [string, keyof Settings | null, "toggle" | "seg" | "size" | null][] = [
     ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
     ["可重骰門檻", null, null], ["rerollBelow", "rerollBelow", "seg"],
-    ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、核心裝", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"],
+    ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"],
     ["商店", null, null], ["選角時把出裝寫進商店的物品組合", "itemSets", "toggle"]];
   let y = 96, body = "";
   for (const [label, key, kind] of rows) {
@@ -257,15 +255,13 @@ export function render(root: HTMLElement, v: View): void {
   // the champion's icons load first (from champ select on); until they are in, nothing of the champion shows, so the
   // panels never appear empty and fill in icon by icon
   const ready = !champ || loaded([...champ.play.map((r) => r.icon),
-    ...champ.styles.flatMap((s) => [...s.core.map((c) => c.icon), ...(s.boots ? [s.boots.icon] : [])])], v.redraw);
+    ...champ.styles.flatMap((s) => [...s.core, ...(s.third ?? []), ...(s.late ?? []), ...(s.boots ? [s.boots] : [])].map((c) => c.icon))], v.redraw);
   if (champ && ready && inGame) html += toggleButton(open, v.settings.panelOffsets.toggle);
   // the panels: in champ select; in game at each pick, in the shop, or when the toggle opened them
   if (champ && ready && open) {
     html += leftPanel(v, champ, span);
     const chosen = styleOf(v.data, st.champion, v.settings.styleKey);
-    const items = chosen ? [...chosen.core, ...(chosen.boots ? [chosen.boots] : [])] : [];   // the core items, then the boots
-    if (v.settings.showHint) html += rightPanel(champ, items, span, v.settings.panelOffsets.right, v.settings.panelScale);
-    if (v.ui.moreOpen) html += moreList(champ, chosen);
+    if (v.settings.showHint) html += rightPanel(champ, chosen, span, v.settings.panelOffsets.right, v.settings.panelScale);
   }
   if (pick) {
     const vds = verdicts(v);
