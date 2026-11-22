@@ -107,3 +107,16 @@ button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 /* champ select, when the game is set to exclusive fullscreen: the overlay will not work in game */
 .fullscreen-warn { left: 560px; top: 40px; width: 800px; padding: 14px 20px; font-size: 18px; line-height: 1.5; color: #F0E6D2; background: rgba(110, 28, 18, 0.92); border: 1px solid #C8AA6E; border-radius: 4px; text-align: center; }
 .fullscreen-warn b { display: block; font-size: 22px; color: #F5D07A; margin-bottom: 4px; }
+
+/* motion (src/motion.ts): parts fade in instead of popping up; a rerolled card's plate turns over like the card does.
+   Only the start is given, so each part ends on its own look (the toggle's half see-through, a panel's scale). */
+@keyframes fade { from { opacity: 0; translate: 0 8px; } }
+@keyframes flip {
+  0% { opacity: 0; transform: perspective(800px) rotateY(-90deg); filter: brightness(2.2); }
+  55% { opacity: 1; transform: perspective(800px) rotateY(14deg); filter: brightness(1.6); }
+  80% { transform: perspective(800px) rotateY(-4deg); }
+}
+@keyframes glow-late { 0%, 50% { opacity: 0; } }
+.np { transform-origin: 50% 50%; backface-visibility: hidden; }
+.core-empty { display: block; width: 52px; height: 52px; border-radius: 4px; border: 1px solid rgba(200, 170, 110, 0.35); box-sizing: border-box; }
+@media (prefers-reduced-motion: reduce) { .abs { animation: none !important; } }

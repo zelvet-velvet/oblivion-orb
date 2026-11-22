@@ -7,6 +7,7 @@
 import dataJson from "./data/game-data.json";
 import { gameLayer, SAMPLES } from "./mock";
 import { makeNameMatcher } from "./names";
+import { itemSets } from "./itemsets";
 import { SHARD_NAME, shardOf } from "./shards";
 import { autoOpen, panelsOpen, render, type Action, type UiState } from "./overlay";
 import { DEFAULT_SETTINGS, type GameData, type GameState, type Mode, type Rect, type Settings } from "./types";
@@ -35,8 +36,28 @@ function fit() {
 
 let lastLine = "";
 function draw() {
-  render(stage, { data, state, settings, ui });
-  if (inApp) { void sendHitRegions(); void pageLog(); }
+  render(stage, { data, state, settings, ui, redraw: draw });
+  if (inApp) { void sendHitRegions(); void pageLog(); scheduleItemSets(); }
+}
+
+// in champ select, the champion's builds go into the client as item sets (the shop lists them in game): once the
+// champion and the style have stayed the same for a moment, so a bench swap or a style click writes once, not per change
+let setsWritten = "", setsTimer = 0;
+function scheduleItemSets() {
+  const champ = state.champion ? data.champions[state.champion] : undefined;
+  const want = state.phase === "champ-select" && settings.itemSets && champ ? `${state.champion}|${settings.styleKey}` : "";
+  if (!want || want === setsWritten) { clearTimeout(setsTimer); setsTimer = 0; return; }
+  if (setsTimer) return;
+  setsTimer = window.setTimeout(async () => {
+    setsTimer = 0;
+    const now = state.phase === "champ-select" && settings.itemSets && state.champion ? `${state.champion}|${settings.styleKey}` : "";
+    if (now !== want) { scheduleItemSets(); return; }
+    const sets = itemSets(data.champions[state.champion!], settings.styleKey);
+    setsWritten = want;
+    if (!sets.length) return;
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("write_item_sets", { sets });
+  }, 1500);
 }
 
 /** What the page shows, into the app's reader.log when it changes. */
@@ -189,6 +210,13 @@ if (inApp) {
   if (q.get("shift") != null) state = { ...state, shift: true, hover: Number(q.get("shift")) };
   const setShift = (on: boolean) => { if (state.shift !== on) setState({ ...state, shift: on }); };
   addEventListener("keydown", (e) => { if (e.key === "Shift") setShift(true); });
+  // R: the first card rerolled into another of the champion's augments, to see the plate turn over
+  addEventListener("keydown", (e) => {
+    const rows = state.champion ? Object.values(data.champions[state.champion]?.tiers ?? {})[0] : undefined;
+    if (e.key.toLowerCase() !== "r" || !rows?.length || !state.offers.length) return;
+    const id = rows[Math.floor(Math.random() * rows.length)][0];
+    setState({ ...state, offers: state.offers.map((o, i) => (i === 0 ? { ...o, id, shard: undefined, reroll: null } : o)) });
+  });
   addEventListener("keyup", (e) => { if (e.key === "Shift") setShift(false); });
   addEventListener("blur", () => setShift(false));
   addEventListener("mousemove", (e) => {

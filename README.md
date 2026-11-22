@@ -11,8 +11,10 @@ Sibling of [Morellonomicon (黑魔禁書)](https://github.com/zelvet-velvet/More
 - **The champion's special play** on top (Mundo: Q takes no AP, AD or health, so look for damage amps and penetration).
 - **Under each card**, a plate with the tier in the game's augment tile (S prismatic, A/B gold, C dim silver), a one-word verdict and why. The best card gets a line round it; the card worth rerolling gets corner marks on its reroll button.
 - **能力值加成 rounds** (stat shards such as 魔法攻擊碎片 or 不屈碎片): rated from the play style's role and damage type, as 很合, 還行 or 不合.
-- **The orb** on the left edge in game opens or closes the panels at any time (drag it to move it). They open by themselves at a pick and while the shop is open (found wherever it was dragged), beside the cards or the shop, and close again after.
+- **The arrow tab** on the left edge in game opens or closes the panels at any time (drag it to move it). They open by themselves at a pick and while the shop is open (found wherever it was dragged), beside the cards or the shop, and close again after.
 - **Hovering a card** hides everything over the cards, so the game's tooltip is never covered; **hold Shift** over it for the card's verdict and full reason above the cards.
+- **Item sets**: in champ select the champion's builds go into the client as item sets (one per play style, the chosen one first), so the in-game shop lists them in its item-set menu. Only sets titled 遺忘寶珠 · … are replaced; your own stay. Off in 設定 › 商店.
+- **Motion**: the panels show only once their icons have loaded, and fade in; a rerolled card's plate turns over with the card.
 
 ## How it works
 A separate always-on-top window (Tauri 2, about 40–80 MB of RAM) that lets clicks through to the game except over its own controls. It reads your champion from the League client's local API (champ select) and the game's Live Client Data API, and will look only at the three card areas of the screen when a pick is open. It never reads or changes the game's memory.
@@ -27,7 +29,7 @@ npm test          # the ranking
 npm run dev       # the overlay in a browser: http://localhost:1420/?sample=mundo (also kaisa, ahri, jhin, unknown)
 ```
 
-In the browser, hold **Shift** over a card for the note; the play-style panel, the mode and 設定 work.
+In the browser, hold **Shift** over a card for the note, press **R** to reroll the first card; the play-style panel, the mode and 設定 work.
 
 ### The app (Windows)
 Needs the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/): Microsoft C++ Build Tools (the "Desktop development with C++" workload), Rust and Node.js, for example:
