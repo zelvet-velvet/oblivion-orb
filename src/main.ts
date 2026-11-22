@@ -8,7 +8,7 @@ import dataJson from "./data/game-data.json";
 import { gameLayer, SAMPLES } from "./mock";
 import { makeNameMatcher } from "./names";
 import { SHARD_NAME, shardOf } from "./shards";
-import { render, type Action, type UiState } from "./overlay";
+import { autoOpen, panelsOpen, render, type Action, type UiState } from "./overlay";
 import { DEFAULT_SETTINGS, type GameData, type GameState, type Mode, type Rect, type Settings } from "./types";
 
 const data = dataJson as unknown as GameData;
@@ -88,7 +88,7 @@ stage.addEventListener("click", (e) => {
 addEventListener("keydown", (e) => { if (e.key === "Escape" && ui.settingsOpen) { ui.settingsOpen = false; draw(); } });
 
 // dragging a side panel by its title row; double-click puts it back beside the cards
-type PanelKey = "left" | "right";
+type PanelKey = "left" | "right" | "toggle";
 let drag: { key: PanelKey; x: number; y: number; from: [number, number] } | null = null;
 stage.addEventListener("pointerdown", (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>("[data-drag]");
@@ -104,7 +104,15 @@ addEventListener("pointermove", (e) => {
   settings = { ...settings, panelOffsets: { ...settings.panelOffsets, [drag.key]: [clamp(dx, 1700), clamp(dy, 900)] } };
   draw();
 });
-addEventListener("pointerup", () => { if (drag) { drag = null; saveSettings(); draw(); } });
+addEventListener("pointerup", (e) => {
+  if (!drag) return;
+  // the toggle orb: a click (it barely moved) opens or closes the panels; a drag only moves it
+  if (drag.key === "toggle" && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 5) {
+    settings = { ...settings, panelOffsets: { ...settings.panelOffsets, toggle: drag.from } };
+    ui.panels = panelsOpen(state, ui) ? "closed" : "open";
+  }
+  drag = null; saveSettings(); draw();
+});
 stage.addEventListener("dblclick", (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>("[data-drag]");
   if (!el) return;
@@ -115,6 +123,9 @@ addEventListener("resize", () => { fit(); draw(); });
 
 function setState(next: GameState) {
   if (next.champion !== state.champion) settings = { ...settings, styleKey: null };
+  // a pick or the shop opening shows the panels again even if the toggle closed them, and closes them after
+  if (autoOpen(next) !== autoOpen(state)) ui.panels = null;
+  if (next.phase !== "in-game" && next.phase !== "augment-pick") ui.panels = null;
   state = next; draw();
 }
 
@@ -152,6 +163,7 @@ if (inApp) {
       });
       setState({ ...state, phase: "augment-pick", offers });
     });
+    await listen<Rect | null>("shop", ({ payload: r }) => setState({ ...state, shop: r ? toFrame(r) : null }));
     await listen<Pointer>("pointer", ({ payload: p }) => {
       const x = (p.x - offX) / scale, y = (p.y - offY) / scale;
       const i = state.offers.findIndex((o) => x >= o.card.x && x <= o.card.x + o.card.w && y >= o.card.y && y <= o.card.y + o.card.h);

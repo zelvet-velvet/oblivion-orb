@@ -207,6 +207,44 @@ fn reroll_usable(shot: &Shot, r: Rect) -> bool {
     n > 0.0 && sum / n >= 0.05
 }
 
+/// The shop window, found anywhere on the screen (the player can drag it): its top edge is one straight gold row
+/// (163, 132, 81 at 1080p) over 1000 pixels long, and its bottom edge a dark gold row (66, 48, 16) further down, over the
+/// same columns. Nothing in the game's map draws lines like that. Returns the shop's rect in screen pixels.
+fn find_shop(shot: &Shot, k: f64) -> Option<Rect> {
+    let gold = |(r, g, b): (f32, f32, f32)| (140.0..=200.0).contains(&r) && (110.0..=175.0).contains(&g) && (60.0..=115.0).contains(&b) && r > g && g > b;
+    let dark = |(r, g, b): (f32, f32, f32)| (40.0..=95.0).contains(&r) && (28.0..=70.0).contains(&g) && b <= 35.0 && r > g && g > b;
+    let step = 4;
+    let need = (600.0 * k) as i32; // a run this long (HUD scales smaller than 100% make the shop smaller)
+    for y in 0..shot.h {
+        let (mut run, mut start) = (0, 0);
+        for x in (0..shot.w).step_by(step) {
+            if gold(shot.at(shot.x + x, shot.y + y)) {
+                if run == 0 {
+                    start = x;
+                }
+                run += step as i32;
+            } else {
+                if run >= need {
+                    break;
+                }
+                run = 0;
+            }
+        }
+        if run < need {
+            continue;
+        }
+        // the bottom edge: a dark gold row over most of the same columns, 450 to 850 pixels lower (by the HUD scale)
+        let cols: Vec<i32> = (0..10).map(|i| start + run * (2 * i + 1) / 20).collect();
+        for dy in ((450.0 * k) as i32)..((850.0 * k) as i32).min(shot.h - y) {
+            let hits = cols.iter().filter(|&&x| dark(shot.at(shot.x + x, shot.y + y + dy))).count();
+            if hits >= 8 {
+                return Some(Rect { x: (shot.x + start) as f64, y: (shot.y + y) as f64, w: run as f64, h: dy as f64 + 2.0 });
+            }
+        }
+    }
+    None
+}
+
 /// A small brightness signature of a card's icon area, to see when a card changes (a reroll).
 fn signature(shot: &Shot, cx: i32, cy: i32, size: i32) -> Vec<f32> {
     let mut out = Vec::with_capacity(64);
@@ -268,6 +306,8 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
         let mut last_look = Instant::now().checked_sub(Duration::from_secs(60)).unwrap_or_else(Instant::now); // the "look" line in the log, every 10 s
         let mut screen_logged = (0.0, 0.0, 0.0);
         let mut raised = Instant::now().checked_sub(Duration::from_secs(60)).unwrap_or_else(Instant::now);
+        let mut shop: Option<Rect> = None; // the shop window while it is open
+        let mut shop_look = Instant::now();
         let close = |app: &AppHandle, diag: &Diag, why: &str| {
             diag.log(&format!("pick closed ({why})"));
             let _ = app.emit("pick", Pick { open: false, cards: vec![] });
@@ -279,6 +319,9 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
                 if open.take().is_some() {
                     close(&app, &diag, "the game is over");
                     last = None;
+                }
+                if shop.take().is_some() {
+                    let _ = app.emit("shop", None::<Rect>);
                 }
                 continue;
             }
@@ -296,6 +339,25 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
             let ox = mx + (sw - 1920.0 * k) / 2.0;
             let px = |v: f64| (ox + v * k).round() as i32;
             let py = |v: f64| (my + v * k).round() as i32;
+            let css = |r: Rect| Rect { x: (r.x - mx) / scale, y: (r.y - my) / scale, w: r.w / scale, h: r.h / scale };
+            // the shop, twice a second while no pick is open: a copy of the whole screen
+            if open.is_none() && shop_look.elapsed() >= Duration::from_millis(500) {
+                shop_look = Instant::now();
+                let found = capture(mx as i32, my as i32, sw as i32, sh as i32).and_then(|s| find_shop(&s, k));
+                let moved = |a: Rect, b: Rect| (a.x - b.x).abs() > 8.0 || (a.y - b.y).abs() > 8.0;
+                let changed = match (found, shop) {
+                    (Some(a), Some(b)) => moved(a, b),
+                    (a, b) => a.is_some() != b.is_some(),
+                };
+                if changed {
+                    diag.log(&match found {
+                        Some(r) => format!("shop open at ({:.0}, {:.0}), {:.0}x{:.0}", r.x, r.y, r.w, r.h),
+                        None => "shop closed".into(),
+                    });
+                    let _ = app.emit("shop", found.map(css));
+                }
+                shop = found;
+            }
             // one copy round the widest pick (four cards) and the buttons
             let widest = card_xs(LAYOUTS[0]);
             let (x0, y0) = (px(widest[0]), py(CARD_Y));
@@ -353,7 +415,6 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
                 raise(&app);
             }
 
-            let css = |r: Rect| Rect { x: (r.x - mx) / scale, y: (r.y - my) / scale, w: r.w / scale, h: r.h / scale };
             let mut cards = Vec::with_capacity(n);
             for (i, cx) in card_xs(n).into_iter().enumerate() {
                 let card = Rect { x: ox + cx * k, y: my + CARD_Y * k, w: CARD_W * k, h: CARD_H * k };

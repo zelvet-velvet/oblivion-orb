@@ -9,7 +9,19 @@ import {
 import { rankOffers, shortWhy, styleOf, type Verdict } from "./rank";
 import type { ChampionData, CoreItem, GameData, GameState, Mode, Offer, Settings, Tier } from "./types";
 
-export interface UiState { settingsOpen: boolean; test?: boolean; fullscreen?: boolean }
+export interface UiState {
+  settingsOpen: boolean; test?: boolean; fullscreen?: boolean;
+  /** the toggle button's choice in game: open or closed; null follows the game (open at a pick and in the shop) */
+  panels?: "open" | "closed" | null;
+}
+
+/** In game, whether the side panels show: the player's choice, else open while a pick or the shop is open. */
+export function panelsOpen(st: GameState, ui: UiState): boolean {
+  if (st.phase === "champ-select") return true;
+  if (st.phase !== "in-game" && st.phase !== "augment-pick") return false;
+  return ui.panels ? ui.panels === "open" : autoOpen(st);
+}
+export const autoOpen = (st: GameState) => (st.phase === "augment-pick" && st.offers.length > 0) || !!st.shop;
 export interface View { data: GameData; state: GameState; settings: Settings; ui: UiState }
 export type Action =
   | { type: "pick-style"; key: string } | { type: "mode"; mode: Mode }
@@ -36,6 +48,14 @@ function cardSpan(offers: Offer[]): Span {
 
 export function verdicts(v: View): Verdict[] {
   return rankOffers(v.data, v.state.champion, v.settings, v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null, shard: o.shard })));
+}
+
+/** The orb on the screen's left edge in game: click to open or close the panels, drag to move it. */
+function toggleButton(open: boolean, offset: [number, number] = [0, 0]): string {
+  const S = 48, X = 14 + offset[0], Y = 220 + offset[1];
+  return box(X, Y, S, S, `toggle${open ? " on" : ""}`, `data-drag="toggle" data-hit title="${open ? "收起" : "展開"}遺忘寶珠（可拖曳）"`)
+    + plate(S, S, open ? TEAL : GOLD, open ? 0.9 : 0.7)
+    + `<span class="toggle-orb"></span><span class="toggle-ch">${open ? "‹" : "›"}</span></div>`;
 }
 
 /** The panel's title row: drag it to move the panel, double-click it to put the panel back beside the cards. */
@@ -172,10 +192,16 @@ export function render(root: HTMLElement, v: View): void {
   const st = v.state;
   const champ = st.champion ? v.data.champions[st.champion] : undefined;
   const pick = st.phase === "augment-pick" && st.offers.length > 0;
-  const span = cardSpan(pick ? st.offers : []);
+  // beside the cards at a pick; beside the shop (and its quick-buy column on the left) while it is open
+  const span = pick ? cardSpan(st.offers)
+    : st.shop ? { left: st.shop.x - 90, right: st.shop.x + st.shop.w, top: st.shop.y, bottom: st.shop.y + st.shop.h }
+    : cardSpan([]);
   let html = "";
-  // the panels: in champ select and at each pick, never over live play
-  if (champ && (pick || st.phase === "champ-select")) {
+  const inGame = st.phase === "in-game" || st.phase === "augment-pick";
+  const open = panelsOpen(st, v.ui);
+  if (champ && inGame) html += toggleButton(open, v.settings.panelOffsets.toggle);
+  // the panels: in champ select; in game at each pick, in the shop, or when the toggle opened them
+  if (champ && open) {
     html += leftPanel(v, champ, span);
     if (v.settings.showHint) html += rightPanel(champ, styleOf(v.data, st.champion, v.settings.styleKey)?.core ?? [], span, v.settings.panelOffsets.right);
   }

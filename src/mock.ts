@@ -28,6 +28,10 @@ export const SAMPLES: Record<string, { state: GameState }> = {
     state: { phase: "augment-pick", champion: "Ekko", round: null,
       offers: sampleOffers([null, null, null]).map((o, k) => ({ ...o, shard: (["ap", "resist", "magicpen"] as const)[k] })), shift: false, hover: null },
   },
+  shop: {   // in game with the shop open (where Zaviel's screenshot has it): the panels open beside it
+    state: { phase: "in-game", champion: "Ekko", round: null, offers: [], shift: false, hover: null,
+      shop: { x: 481, y: 133, w: 1047, h: 747 } },
+  },
   unknown: {   // a card not read yet and a pick with no reroll left
     state: { phase: "augment-pick", champion: "DrMundo", round: "金",
       offers: sampleOffers([1353, null, 3071]).map((o) => ({ ...o, reroll: null })), shift: false, hover: null },
@@ -39,6 +43,7 @@ export function gameLayer(data: GameData, s: GameState): string {
   const champ = s.champion ? data.champions[s.champion] : undefined;
   const splash = champ ? `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${s.champion}_0.jpg` : "";
   let h = (splash ? `<img class="abs g-splash" src="${splash}" alt="">` : "") + `<div class="abs g-dim"></div><div class="abs g-title">選擇一個強化</div>`;
+  if (s.shop) h += `<div class="abs g-card" style="left:${s.shop.x}px;top:${s.shop.y}px;width:${s.shop.w}px;height:${s.shop.h}px"><div class="g-name" style="margin-top:320px">商店</div></div>`;
   for (const o of s.offers) {
     const a = o.id != null ? data.augments[String(o.id)] : undefined;
     h += `<div class="abs g-card" style="left:${o.card.x}px;top:${o.card.y}px;width:${o.card.w}px;height:${o.card.h}px">`

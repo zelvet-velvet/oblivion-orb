@@ -25,6 +25,7 @@ export interface GameState {
   offers: Offer[];
   shift: boolean;             // Shift held
   hover: number | null;       // the offer under the cursor
+  shop?: Rect | null;         // the shop window while it is open (the reader finds it wherever it was dragged)
 }
 
 export interface Settings {
@@ -36,7 +37,7 @@ export interface Settings {
   showHint: boolean;          // 怎麼玩、核心裝 (the right panel)
   onlyOnShift: boolean;       // the verdicts show only while Shift is held
   /** where the player dragged the side panels: [dx, dy] from their place beside the cards, in 1920 × 1080 pixels */
-  panelOffsets: { left?: [number, number]; right?: [number, number] };
+  panelOffsets: { left?: [number, number]; right?: [number, number]; toggle?: [number, number] };
 }
 
 export const DEFAULT_SETTINGS: Settings = {

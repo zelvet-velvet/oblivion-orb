@@ -14,7 +14,12 @@ body { font-family: var(--ui); color: var(--ink); user-select: none; -webkit-fon
 body.browser { background: #000; }
 #stage, #game { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
 .abs { position: absolute; }
-.drag { cursor: move; z-index: 5; }   /* over the panel title, under nothing clickable (the gear is left out of it) */
+.drag { cursor: move; z-index: 5; }
+.toggle { cursor: pointer; }
+.toggle-orb { position: absolute; left: 11px; top: 11px; width: 26px; height: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #E9D8FF 0%, #9B6BFF 35%, #3B1E78 75%, #160A30 100%); box-shadow: 0 0 10px rgba(155, 107, 255, 0.6); }
+.toggle-ch { position: absolute; right: -14px; top: 10px; font-size: 22px; line-height: 26px; color: #C8AA6E; }
+.toggle.on .toggle-ch { color: #0AC8B9; }   /* over the panel title, under nothing clickable (the gear is left out of it) */
 .plate > svg:first-child, button > svg:first-child { position: absolute; left: 0; top: 0; }
 button { all: unset; box-sizing: border-box; cursor: pointer; }
 button:active { opacity: 0.6; }
