@@ -118,6 +118,7 @@ pub fn spawn(app: AppHandle, in_game: Arc<std::sync::atomic::AtomicBool>) {
         let mut sent = Instant::now();
         loop {
             let now = read(&agent);
+            let idle = now.phase == "idle";
             in_game.store(now.phase == "in-game", std::sync::atomic::Ordering::Relaxed);
             if last.as_ref() != Some(&now) || sent.elapsed() > Duration::from_secs(5) {
                 let _ = app.emit("game-reading", now.clone());
@@ -126,7 +127,7 @@ pub fn spawn(app: AppHandle, in_game: Arc<std::sync::atomic::AtomicBool>) {
             }
             // the client is asked once a second only in champ select or in game; idle, every 5 s, so a client left
             // open for hours is not asked 86 400 times a day
-            let pause = if now.phase == "idle" { 5 } else { 1 };
+            let pause = if idle { 5 } else { 1 };
             thread::sleep(Duration::from_secs(pause));
         }
     });
