@@ -36,6 +36,15 @@ def frontmatter(path):
     return out
 
 
+def tier_rows(data, style):
+    """A tier list's rows as dicts: Morellonomicon writes format 2 (each row [id, tier, value, score, reason index, when?], the
+    reasons once in `reasons`); older files have dicts. Only the id, tier, reason and when are kept below."""
+    if data.get("format", 1) < 2:
+        return style["tiers"]
+    reasons = data["reasons"]
+    return [{"id": r[0], "tier": r[1], "reason": reasons[r[4]], "when": r[5] if len(r) > 5 else ""} for r in style["tiers"]]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--from", dest="src", default=str(ROOT.parent / "Morellonomicon"))
@@ -103,7 +112,7 @@ def main():
         ver = dd_version(note.get("icon", ""))
         b = (builds.get(cid) or {}).get("styles") or []
         item = lambda i: {"id": i, "name": item_names.get(i, ""), "icon": f"https://ddragon.leagueoflegends.com/cdn/{ver}/img/item/{i}.png" if ver else ""}
-        tiers = {key: [[r["id"], r["tier"], r.get("reason", ""), r.get("when", "")] for r in st["tiers"] if r.get("tier") in TIERS]
+        tiers = {key: [[r["id"], r["tier"], r.get("reason", ""), r.get("when", "")] for r in tier_rows(data, st) if r.get("tier") in TIERS]
                  for key, st in styles.items()}   # each list already in the order Morellonomicon ranks them
 
         def build_damage(st):
