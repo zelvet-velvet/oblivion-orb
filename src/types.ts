@@ -37,13 +37,14 @@ export interface Settings {
   showHint: boolean;          // 怎麼玩、核心裝 (the right panel)
   onlyOnShift: boolean;       // the verdicts show only while Shift is held
   itemSets: boolean;          // write the champion's builds into the client as item sets (the shop's recommended tab)
+  panelScale: number;         // the side panels' size (1: as drawn; they still shrink to fit beside four cards at 1)
   /** where the player dragged the side panels: [dx, dy] from their place beside the cards, in 1920 × 1080 pixels */
   panelOffsets: { left?: [number, number]; right?: [number, number]; toggle?: [number, number] };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   styleKey: null, mode: "均衡", useTiers: true, useSynergy: true,
-  rerollBelow: "B", showHint: true, onlyOnShift: false, itemSets: true, panelOffsets: {},
+  rerollBelow: "B", showHint: true, onlyOnShift: false, itemSets: true, panelScale: 1, panelOffsets: {},
 };
 
 // ---- the data built by tools/build_data.py from Morellonomicon ----
@@ -53,7 +54,11 @@ export type TierRow = [number, Tier, string, string];
 export type Role = "tank" | "fighter" | "mage" | "marksman" | "assassin" | "support";
 export type Damage = "phys" | "magic";
 /** A play style: one of the champion's builds (Morellonomicon's item-builds), ranked by the closest tier list (tierKey). */
-export interface StyleData { key: string; name: string; role: Role; damage: Damage; core: CoreItem[]; tierKey: string; build?: Build }
+export interface StyleData {
+  key: string; name: string; role: Role; damage: Damage; core: CoreItem[]; tierKey: string; build?: Build;
+  boots?: CoreItem | null;    // the style's boots
+  warn?: "few" | "weak" | ""; // few: few games behind it, weak: it loses; either way its result is not sure
+}
 /** The build's whole item list (ids), for the item set written into the client: core first, then the third item's
  * choices, the boots and the late items. */
 export interface Build { core: number[]; third: number[]; boots: number | null; late: number[] }

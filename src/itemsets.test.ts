@@ -21,6 +21,10 @@ describe("itemSets", () => {
     expect(s.blocks.map((b) => [b.type, b.items.map((i) => i.id)])).toEqual([
       ["核心裝（照順序做）", ["3084", "3083"]], ["第三件（擇一）", ["3065"]], ["鞋子", ["3111"]], ["後期（看局勢）", ["3109"]]]);
   });
+  it("four sets at most: the chosen style and the next most played", () => {
+    const many = { ...champ, styles: ["0", "1", "2", "3", "4", "5"].map((k) => st(k, `玩法${k}`, [3084, 3083])) };
+    expect(itemSets(many, "5").map((s) => s.title.split(" ").pop())).toEqual(["玩法5", "玩法0", "玩法1", "玩法2"]);
+  });
   it("nothing without a key or builds", () => {
     expect(itemSets({ ...champ, key: null }, null)).toEqual([]);
     expect(itemSets({ ...champ, styles: [] }, null)).toEqual([]);

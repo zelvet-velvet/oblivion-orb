@@ -26,7 +26,8 @@ export function itemSets(champ: ChampionData, styleKey: string | null): ItemSet[
   if (champ.key == null) return [];
   const styles = champ.styles.filter((s) => s.build && s.build.core.length);
   const chosen = styles.find((s) => s.key === styleKey) ?? styles[0];
-  const ordered = chosen ? [chosen, ...styles.filter((s) => s !== chosen)] : [];
+  // the chosen style and the next three most played: the shop's item-set menu stays short
+  const ordered = chosen ? [chosen, ...styles.filter((s) => s !== chosen)].slice(0, 4) : [];
   return ordered.map((st, rank) => {
     const b = st.build!, seen = new Set<number>();
     return {

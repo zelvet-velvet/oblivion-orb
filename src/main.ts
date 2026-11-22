@@ -2,7 +2,7 @@
 // reader sees: their names and where they sit) and "pointer" (Shift and the cursor),
 // and the window lets clicks through except over the overlay's own controls (their rects go to Rust as hit regions).
 // In a browser it shows a sample
-// (?sample=mundo | kaisa | unknown, with &open=settings | list or &shift=<card>) over a drawn game screen.
+// (?sample=mundo | kaisa | unknown, with &open=settings | more or &shift=<card>) over a drawn game screen.
 
 import dataJson from "./data/game-data.json";
 import { gameLayer, SAMPLES } from "./mock";
@@ -86,7 +86,9 @@ async function sendHitRegions() {
 
 function act(a: Action) {
   switch (a.type) {
-    case "pick-style": settings = { ...settings, styleKey: a.key }; break;
+    case "pick-style": settings = { ...settings, styleKey: a.key }; ui.moreOpen = false; break;
+    case "open-more": ui.moreOpen = true; break;
+    case "close-more": ui.moreOpen = false; break;
     case "mode": settings = { ...settings, mode: a.mode }; break;
     case "open-settings": ui.settingsOpen = true; break;
     case "close-settings": ui.settingsOpen = false; break;
@@ -103,10 +105,13 @@ stage.addEventListener("click", (e) => {
   else if (t === "pick-style") act({ type: "pick-style", key: el.dataset.key! });
   else if (t === "setting") {
     const raw = el.dataset.value!;
-    act({ type: "setting", key: el.dataset.key as keyof Settings, value: raw === "true" ? true : raw === "false" ? false : raw });
+    act({ type: "setting", key: el.dataset.key as keyof Settings,
+          value: el.dataset.num != null ? Number(raw) : raw === "true" ? true : raw === "false" ? false : raw });
   } else act({ type: t } as Action);
 });
-addEventListener("keydown", (e) => { if (e.key === "Escape" && ui.settingsOpen) { ui.settingsOpen = false; draw(); } });
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && (ui.settingsOpen || ui.moreOpen)) { ui.settingsOpen = false; ui.moreOpen = false; draw(); }
+});
 
 // dragging a side panel by its title row; double-click puts it back beside the cards
 type PanelKey = "left" | "right" | "toggle";
@@ -204,9 +209,10 @@ if (inApp) {
   bar.className = "mock-bar"; bar.textContent = `sample: ${name} · ${Object.keys(SAMPLES).map((k) => `?sample=${k}`).join(" ")} · patch ${data.patch}`;
   document.body.append(bar);
   state = structuredClone(sample.state);
-  // &open=settings | list opens a panel; &shift=0..2 holds Shift over that card (for screenshots)
+  // &open=settings | more opens a panel; &shift=0..2 holds Shift over that card (for screenshots)
   const q = new URLSearchParams(location.search);
   if (q.get("open") === "settings") ui.settingsOpen = true;
+  if (q.get("open") === "more") ui.moreOpen = true;
   if (q.get("shift") != null) state = { ...state, shift: true, hover: Number(q.get("shift")) };
   const setShift = (on: boolean) => { if (state.shift !== on) setState({ ...state, shift: on }); };
   addEventListener("keydown", (e) => { if (e.key === "Shift") setShift(true); });
