@@ -15,10 +15,9 @@ body.browser { background: #000; }
 #stage, #game { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
 .abs { position: absolute; }
 .drag { cursor: move; z-index: 5; }
-.toggle { cursor: pointer; }
-.toggle-orb { position: absolute; left: 6px; top: 6px; width: 36px; height: 36px; image-rendering: pixelated; }
-.toggle-orb svg { display: block; }
-.toggle:not(.on) .toggle-orb { filter: saturate(0.75) brightness(0.85); }   /* closed: the orb a little dimmer */   /* over the panel title, under nothing clickable (the gear is left out of it) */
+.toggle { cursor: pointer; opacity: 0.45; transition: opacity 0.15s; }
+.toggle:hover { opacity: 1; }
+.toggle svg { display: block; }   /* over the panel title, under nothing clickable (the gear is left out of it) */
 .plate > svg:first-child, button > svg:first-child { position: absolute; left: 0; top: 0; }
 button { all: unset; box-sizing: border-box; cursor: pointer; }
 button:active { opacity: 0.6; }

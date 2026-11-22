@@ -32,6 +32,9 @@ export const SAMPLES: Record<string, { state: GameState }> = {
     state: { phase: "in-game", champion: "Ekko", round: null, offers: [], shift: false, hover: null,
       shop: { x: 481, y: 133, w: 1047, h: 747 } },
   },
+  ingame: {   // in game between picks: the panels closed, only the toggle tab
+    state: { phase: "in-game", champion: "Ekko", round: null, offers: [], shift: false, hover: null },
+  },
   unknown: {   // a card not read yet and a pick with no reroll left
     state: { phase: "augment-pick", champion: "DrMundo", round: "金",
       offers: sampleOffers([1353, null, 3071]).map((o) => ({ ...o, reroll: null })), shift: false, hover: null },

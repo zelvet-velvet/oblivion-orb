@@ -3,7 +3,7 @@
 // whatever the reader finds, the marks follow. Everything is redrawn on each change; it is small.
 
 import {
-  DIM, EMBER_TXT, METAL, VERDICT_INK, WHY_INK, TEAL, GOLD, orbIcon,
+  DIM, EMBER_TXT, METAL, VERDICT_INK, WHY_INK, TEAL, GOLD,
   gear, hextechFrame, plate, plateGlow, rarityPlate, rerollTag, richApAd, roleIcon, dmgPill, tile, toggle,
 } from "./art";
 import { rankOffers, shortWhy, styleOf, type Verdict } from "./rank";
@@ -50,12 +50,14 @@ export function verdicts(v: View): Verdict[] {
   return rankOffers(v.data, v.state.champion, v.settings, v.state.offers.map((o) => ({ id: o.id, canReroll: o.reroll !== null, shard: o.shard })));
 }
 
-/** The orb on the screen's left edge in game: click to open or close the panels, drag to move it. */
+/** A slim tab on the screen's left edge in game, only an arrow: click to open or close the panels, drag to move it.
+ * Half see-through until the cursor is on it, so it never draws the eye during play. */
 function toggleButton(open: boolean, offset: [number, number] = [0, 0]): string {
-  const S = 48, X = 14 + offset[0], Y = 220 + offset[1];
-  return box(X, Y, S, S, `toggle${open ? " on" : ""}`, `data-drag="toggle" data-hit title="${open ? "收起" : "展開"}遺忘寶珠（可拖曳）"`)
-    + plate(S, S, open ? TEAL : GOLD, open ? 0.9 : 0.7)
-    + `<span class="toggle-orb">${orbIcon(2)}</span></div>`;
+  const W = 20, H = 56, X = offset[0], Y = 220 + offset[1];
+  const arrow = open ? "M12 18 L7 28 L12 38" : "M8 18 L13 28 L8 38";
+  return box(X, Y, W, H, "toggle", `data-drag="toggle" data-hit title="${open ? "收起" : "展開"}建議（可拖曳）"`)
+    + `<svg width="${W}" height="${H}"><path d="M0 0 H${W - 6} Q${W} 0 ${W} 6 V${H - 6} Q${W} ${H} ${W - 6} ${H} H0 Z" fill="#010A13" fill-opacity="0.55" stroke="${GOLD}" stroke-opacity="0.35"/>`
+    + `<path d="${arrow}" fill="none" stroke="#C8AA6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
 }
 
 /** The panel's title row: drag it to move the panel, double-click it to put the panel back beside the cards. */
