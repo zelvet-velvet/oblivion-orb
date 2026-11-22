@@ -314,7 +314,7 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
         };
         loop {
             let reading = in_game.load(Ordering::Relaxed) || diag.test();
-            thread::sleep(Duration::from_millis(if reading { 250 } else { 1000 }));
+            thread::sleep(Duration::from_millis(if reading { 200 } else { 1000 }));
             if !reading {
                 if open.take().is_some() {
                     close(&app, &diag, "the game is over");
@@ -340,8 +340,8 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
             let px = |v: f64| (ox + v * k).round() as i32;
             let py = |v: f64| (my + v * k).round() as i32;
             let css = |r: Rect| Rect { x: (r.x - mx) / scale, y: (r.y - my) / scale, w: r.w / scale, h: r.h / scale };
-            // the shop, twice a second while no pick is open: a copy of the whole screen
-            if open.is_none() && shop_look.elapsed() >= Duration::from_millis(500) {
+            // the shop, five times a second while no pick is open (the panels follow it open and shut): a copy of the whole screen
+            if open.is_none() && shop_look.elapsed() >= Duration::from_millis(180) {
                 shop_look = Instant::now();
                 let found = capture(mx as i32, my as i32, sw as i32, sh as i32).and_then(|s| find_shop(&s, k));
                 let moved = |a: Rect, b: Rect| (a.x - b.x).abs() > 8.0 || (a.y - b.y).abs() > 8.0;
