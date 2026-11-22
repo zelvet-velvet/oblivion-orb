@@ -3,7 +3,7 @@
 // whatever the reader finds, the marks follow. Everything is redrawn on each change; it is small.
 
 import {
-  DIM, EMBER_TXT, METAL, VERDICT_INK, WHY_INK, TEAL, GOLD,
+  DIM, EMBER_TXT, METAL, VERDICT_INK, WHY_INK, TEAL, GOLD, orbIcon,
   gear, hextechFrame, plate, plateGlow, rarityPlate, rerollTag, richApAd, roleIcon, dmgPill, tile, toggle,
 } from "./art";
 import { rankOffers, shortWhy, styleOf, type Verdict } from "./rank";
@@ -55,7 +55,7 @@ function toggleButton(open: boolean, offset: [number, number] = [0, 0]): string 
   const S = 48, X = 14 + offset[0], Y = 220 + offset[1];
   return box(X, Y, S, S, `toggle${open ? " on" : ""}`, `data-drag="toggle" data-hit title="${open ? "收起" : "展開"}遺忘寶珠（可拖曳）"`)
     + plate(S, S, open ? TEAL : GOLD, open ? 0.9 : 0.7)
-    + `<span class="toggle-orb"></span><span class="toggle-ch">${open ? "‹" : "›"}</span></div>`;
+    + `<span class="toggle-orb">${orbIcon(2)}</span></div>`;
 }
 
 /** The panel's title row: drag it to move the panel, double-click it to put the panel back beside the cards. */
