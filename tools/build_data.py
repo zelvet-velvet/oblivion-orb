@@ -127,10 +127,12 @@ def main():
             return ROLE.get(first_role, "fighter")
 
         out_styles = []
-        if b:   # the play styles are the champion's builds; each ranks augments by the closest tier list
+        if b:   # the play styles are the champion's builds; each ranks augments by its own tier list (Morellonomicon keys one per
+            # play style when our crawl splits the games by style), else the closest one (ap / ad / main, from resg.top's totals)
             for k, st in enumerate(b[:4]):
                 dmg = build_damage(st)
-                tk = ("ap" if dmg == "magic" else "ad") if ("ap" if dmg == "magic" else "ad") in tiers else "main" if "main" in tiers else next(iter(tiers))
+                close = "ap" if dmg == "magic" else "ad"
+                tk = st.get("name") if st.get("name") in tiers else close if close in tiers else "main" if "main" in tiers else next(iter(tiers))
                 ids = ([c["id"] for c in st.get("core", [])] + [c["id"] for c in st.get("third", [])[:1]])[:3]
                 # the whole build, for the item set written into the client (the shop's recommended tab): ids only
                 ids_of = lambda rows: [r["id"] for r in rows or [] if isinstance(r, dict) and r.get("id")]
