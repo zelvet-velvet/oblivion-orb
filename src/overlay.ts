@@ -158,7 +158,7 @@ function banner(v: View, vd: Verdict): string {
     + (t ? `<div class="abs" style="left:24px;top:36px">${tile(t, 58)}</div>` : "")
     + `<div class="abs b-head" style="left:${tx}px;color:${t ? VERDICT_INK[t] : DIM}">${esc(head)}</div>`
     + `<div class="abs b-why" style="left:${tx}px;color:${t ? WHY_INK[t] : DIM}">${richApAd(vd.why)}</div>`
-    + `<div class="abs b-foot">${v.state.shift ? "放開 Shift 收起" : "按住 Shift 看它吃什麼數值"}</div></div>`;
+    + `<div class="abs b-foot">放開 Shift 收起</div></div>`;
 }
 
 function settingsPanel(s: Settings): string {
@@ -209,8 +209,8 @@ export function render(root: HTMLElement, v: View): void {
   }
   if (pick) {
     const vds = verdicts(v);
-    // while a card is hovered the game's tooltip opens over the cards' lower half: the plates and the best card's frame
-    // step aside (the banner above the cards says the hovered card's verdict)
+    // while a card is hovered the game's tooltip opens over the cards (below their names, or above the cards when its
+    // text is long): the plates, the best card's frame and the banner step aside; Shift brings the banner back
     const hovering = st.hover != null;
     const showPlates = (!v.settings.onlyOnShift || st.shift) && !hovering;
     st.offers.forEach((o, i) => {
@@ -223,7 +223,8 @@ export function render(root: HTMLElement, v: View): void {
         html += box(x, y, tw, th, "deco tag") + rerollTag(tw, th) + `<span>↻ 建議重骰</span></div>`;
       }
     });
-    if (st.hover != null && vds[st.hover]) html += banner(v, vds[st.hover]);
+    // the game's tooltip may open above the cards too (a long text): the banner shows only while Shift is held
+    if (st.hover != null && st.shift && vds[st.hover]) html += banner(v, vds[st.hover]);
   }
   if (v.ui.settingsOpen) html += settingsPanel(v.settings);
   if (v.ui.fullscreen && st.phase === "champ-select")

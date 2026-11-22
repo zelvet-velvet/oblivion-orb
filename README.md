@@ -12,7 +12,7 @@ Sibling of [Morellonomicon (黑魔禁書)](https://github.com/zelvet-velvet/More
 - **Under each card**, a plate with the tier in the game's augment tile (S prismatic, A/B gold, C dim silver), a one-word verdict and why. The best card gets a line round it; the card worth rerolling gets corner marks on its reroll button.
 - **能力值加成 rounds** (stat shards such as 魔法攻擊碎片 or 不屈碎片): rated from the play style's role and damage type, as 很合, 還行 or 不合.
 - **The orb** on the left edge in game opens or closes the panels at any time (drag it to move it). They open by themselves at a pick and while the shop is open (found wherever it was dragged), beside the cards or the shop, and close again after.
-- **Hold Shift** over a card: the game's own detail, with the phrase that matters for your champion marked.
+- **Hovering a card** hides everything over the cards, so the game's tooltip is never covered; **hold Shift** over it for the card's verdict and full reason above the cards.
 
 ## How it works
 A separate always-on-top window (Tauri 2, about 40–80 MB of RAM) that lets clicks through to the game except over its own controls. It reads your champion from the League client's local API (champ select) and the game's Live Client Data API, and will look only at the three card areas of the screen when a pick is open. It never reads or changes the game's memory.
