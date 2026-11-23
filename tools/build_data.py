@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "src" / "data" / "game-data.json"
 TIERS = "SABC"
+TIERS_ALL = "SABCD"   # the overlay's letters: Morellonomicon's C split into B, C and D (grade below)
 # Morellonomicon's C rows, by the row's value (the augment's result on the champion against the champion's own, a share):
 FINE = -0.02        # above this, about as good as the champion's average: 可考慮 (B)
 TRASH = -0.05       # at or below this, far worse: 垃圾 (D); in between 不合 (C)
@@ -59,6 +60,25 @@ def grade(row, trash_ids):
     if v > FINE:
         return "B"
     return "D" if v <= TRASH or row["id"] in trash_ids else "C"
+
+
+def general_verdicts(augments, champions, unrated):
+    """Each augment's verdict across all champions (`general`: the middle letter of every list that rates it, and its most
+    common reason), shown as 通用 on a champion with no tier for it (the game never offers it there, or the champion is not
+    known yet); and why an augment has no tier anywhere (`off`: 目前停用, 沒有對局資料), from Morellonomicon's `unrated`."""
+    letters, reasons = {}, {}
+    for champ in champions.values():
+        for rows in champ["tiers"].values():
+            for i, tier, why, _ in rows:
+                letters.setdefault(i, []).append(TIERS_ALL.index(tier))
+                reasons.setdefault(i, {})[why] = reasons.get(i, {}).get(why, 0) + 1
+    for k, a in augments.items():
+        ranks = sorted(letters.get(int(k), []))
+        if ranks:
+            why = max(reasons[int(k)].items(), key=lambda kv: (kv[1], kv[0] != ""))[0]
+            a["general"] = [TIERS_ALL[ranks[len(ranks) // 2]], why]
+        elif k in unrated:
+            a["off"] = unrated[k]
 
 
 def trash_augments(data):
@@ -198,6 +218,7 @@ def main():
         champions[cid] = {"key": note.get("key"), "name": note.get("name", cid), "icon": note.get("icon", ""), "styles": out_styles,
                           "tiers": tiers, "play": play_rows(note)}
 
+    general_verdicts(augments, champions, data.get("unrated", {}))
     out = {"patch": data.get("patch", ""), "source": data.get("source", ""), "augments": augments, "champions": champions}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
