@@ -19,7 +19,11 @@ const KEY = "oblivion-orb.settings";
 const LAST_CHAMP = "oblivion-orb.last-champion";
 
 function loadSettings(): Settings {
-  try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }; } catch { return { ...DEFAULT_SETTINGS }; }
+  try {
+    const { onlyOnShift, ...saved } = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    // the old 只在按住 Shift 時顯示建議 toggle is the 建議標示 choice 按 Shift 顯示
+    return { ...DEFAULT_SETTINGS, ...(onlyOnShift && !saved.marks && { marks: "shift" }), ...saved };
+  } catch { return { ...DEFAULT_SETTINGS }; }
 }
 function saveSettings() { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch { /* private mode: settings last the session */ } }
 

@@ -192,11 +192,16 @@ function banner(v: View, vd: Verdict): string {
     + `<div class="abs b-foot">放開 Shift 收起</div></div>`;
 }
 
+const CHOICES = {
+  marks: [["一直顯示", "always"], ["滑到卡上隱藏", "hover-hide"], ["按 Shift 顯示", "shift"]],
+  friends: [["有朋友", true], ["沒朋友qq", false]],
+} as const;
+
 function settingsPanel(s: Settings): string {
   const W = 640, X = 960 - W / 2, Y = 196;
-  const rows: [string, keyof Settings | null, "toggle" | "size" | "friends" | null][] = [
+  const rows: [string, keyof Settings | null, "toggle" | "size" | "choice" | null][] = [
     ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
-    ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"], ["可考慮的卡", "friends", "friends"],
+    ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["建議標示", "marks", "choice"], ["可考慮的卡", "friends", "choice"],
     ["商店", null, null], ["選角時把出裝寫進商店的物品組合", "itemSets", "toggle"]];
   let y = 96, body = "";
   for (const [label, key, kind] of rows) {
@@ -208,11 +213,11 @@ function settingsPanel(s: Settings): string {
         body += `<button class="seg-b${on ? " on" : ""}" data-act="setting" data-key="panelScale" data-value="${k}" data-num data-hit>${plate(54, 40, on ? TEAL : GOLD, on ? 0.9 : 0.65)}<span>${word}</span></button>`;
       }
       body += `</div></div>`;
-    } else if (kind === "friends") {   // the 可考慮 card's tag: 問朋友 with friends to ask, 沒興趣 alone
+    } else if (kind === "choice") {   // a few named choices: 建議標示; the 可考慮 card's tag (問朋友 with friends, 沒興趣 alone)
       body += `<div class="abs s-row" style="top:${y}px"><span>${label}</span><div class="seg">`;
-      for (const [word, on] of [["有朋友", true], ["沒朋友qq", false]] as const) {
-        const sel = s.friends === on, w = on ? 84 : 112;
-        body += `<button class="seg-b${sel ? " on" : ""}" style="width:${w}px" data-act="setting" data-key="friends" data-value="${on}" data-hit>${plate(w, 40, sel ? TEAL : GOLD, sel ? 0.9 : 0.65)}<span>${word}</span></button>`;
+      for (const [word, value] of CHOICES[key as keyof typeof CHOICES]) {
+        const sel = s[key!] === value, w = [...word].reduce((n, c) => n + (c.charCodeAt(0) > 0x2e80 ? 19 : 10), 22);   // Chinese characters, then Latin
+        body += `<button class="seg-b${sel ? " on" : ""}" style="width:${w}px" data-act="setting" data-key="${key}" data-value="${value}" data-hit>${plate(w, 40, sel ? TEAL : GOLD, sel ? 0.9 : 0.65)}<span>${word}</span></button>`;
       }
       body += `</div></div>`;
     } else {
@@ -256,23 +261,22 @@ export function render(root: HTMLElement, v: View): void {
   }
   if (pick) {
     const vds = verdicts(v);
-    // while a card is hovered the game's tooltip opens over the cards (below their names, or above the cards when its
-    // text is long): the plates, the best card's frame and the banner step aside; Shift brings the banner back
-    const hovering = st.hover != null;
-    const showPlates = (!v.settings.onlyOnShift || st.shift) && !hovering;
+    // the marks (the best card's frame, the plates, the reroll tags) show and hide together, by 建議標示: always; not while
+    // the cursor is on any card (the game's tooltip opens over the cards there); or only while Shift is held
+    const m = v.settings.marks;
+    const showMarks = m === "always" || (m === "shift" ? st.shift : st.hover == null);
     st.offers.forEach((o, i) => {
       const vd = vds[i];
       // a card that changed while the pick stays open (a reroll) flips its plate in; otherwise the plates fade in
       const what = o.shard !== undefined ? `shard:${o.shard}` : `id:${o.id}`;
       const rerolled = cardWas.has(i) && cardWas.get(i) !== what;
       cardWas.set(i, what);
-      if (vd.best && !hovering)
+      if (vd.best && showMarks)
         html += box(o.card.x - 34, o.card.y - 34, o.card.w + 68, o.card.h + 68, "deco", "", motion(`best:${i}:${what}`, "fade", FADE)) + hextechFrame(o.card.w, o.card.h) + `</div>`;
-      if (showPlates)
+      if (showMarks)
         html += nameplate(o, vd, motion(`np:${i}:${what}`, rerolled ? "flip" : "fade", rerolled ? FLIP : FADE),
                           motion(`glow:${i}:${what}`, rerolled ? "glow-late" : "fade", rerolled ? FLIP : FADE));
-      // the tag hangs where the game's tooltip opens, so it hides while a card is hovered
-      if ((vd.reroll || vd.tryReroll) && o.reroll && st.hover == null) {
+      if ((vd.reroll || vd.tryReroll) && o.reroll && showMarks) {
         const tw = 156, th = 42, x = o.reroll.x + o.reroll.w / 2 - tw / 2, y = o.reroll.y + o.reroll.h + 4;
         html += box(x, y, tw, th, `deco tag${vd.reroll ? "" : " soft"}`, "", motion(`tag:${i}`, "fade", FADE)) + rerollTag(tw, th, !vd.reroll)
           + `<span>${vd.reroll ? "↻ 建議重骰" : v.settings.friends ? "↻ 問朋友" : "↻ 沒興趣"}</span></div>`;
