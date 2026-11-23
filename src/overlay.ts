@@ -194,9 +194,9 @@ function banner(v: View, vd: Verdict): string {
 
 function settingsPanel(s: Settings): string {
   const W = 640, X = 960 - W / 2, Y = 196;
-  const rows: [string, keyof Settings | null, "toggle" | "size" | null][] = [
+  const rows: [string, keyof Settings | null, "toggle" | "size" | "friends" | null][] = [
     ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
-    ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"],
+    ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"], ["可考慮的卡", "friends", "friends"],
     ["商店", null, null], ["選角時把出裝寫進商店的物品組合", "itemSets", "toggle"]];
   let y = 96, body = "";
   for (const [label, key, kind] of rows) {
@@ -206,6 +206,13 @@ function settingsPanel(s: Settings): string {
       for (const [word, k] of [["小", 0.85], ["中", 1], ["大", 1.2], ["特大", 1.4]] as const) {
         const on = Math.abs(s.panelScale - k) < 0.01;
         body += `<button class="seg-b${on ? " on" : ""}" data-act="setting" data-key="panelScale" data-value="${k}" data-num data-hit>${plate(54, 40, on ? TEAL : GOLD, on ? 0.9 : 0.65)}<span>${word}</span></button>`;
+      }
+      body += `</div></div>`;
+    } else if (kind === "friends") {   // the 可考慮 card's tag: 問朋友 with friends to ask, 沒興趣 alone
+      body += `<div class="abs s-row" style="top:${y}px"><span>${label}</span><div class="seg">`;
+      for (const [word, on] of [["有朋友", true], ["沒朋友qq", false]] as const) {
+        const sel = s.friends === on, w = on ? 84 : 112;
+        body += `<button class="seg-b${sel ? " on" : ""}" style="width:${w}px" data-act="setting" data-key="friends" data-value="${on}" data-hit>${plate(w, 40, sel ? TEAL : GOLD, sel ? 0.9 : 0.65)}<span>${word}</span></button>`;
       }
       body += `</div></div>`;
     } else {
@@ -268,7 +275,7 @@ export function render(root: HTMLElement, v: View): void {
       if ((vd.reroll || vd.tryReroll) && o.reroll && st.hover == null) {
         const tw = 156, th = 42, x = o.reroll.x + o.reroll.w / 2 - tw / 2, y = o.reroll.y + o.reroll.h + 4;
         html += box(x, y, tw, th, `deco tag${vd.reroll ? "" : " soft"}`, "", motion(`tag:${i}`, "fade", FADE)) + rerollTag(tw, th, !vd.reroll)
-          + `<span>${vd.reroll ? "↻ 建議重骰" : "↻ 考慮重骰"}</span></div>`;
+          + `<span>${vd.reroll ? "↻ 建議重骰" : v.settings.friends ? "↻ 問朋友" : "↻ 沒興趣"}</span></div>`;
       }
     });
     // the game's tooltip may open above the cards too (a long text): the banner shows only while Shift is held
