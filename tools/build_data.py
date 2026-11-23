@@ -6,7 +6,9 @@
 Reads Morellonomicon's `_data/augment-tiers.json` (each champion's augment tiers and reasons, per play style),
 `_data/item-builds.json` (each play style's build: three core items, another core, boots, items four to six by need), and its augment, champion and item notes (names, icons; the champion's numeric key,
 roles, damage, skills and its one-line play summary `soul`), and writes `src/data/game-data.json`. Augment win rates never leave Morellonomicon: of each tier row only the tier, the reason and the
-row's order are kept. Standard library only.
+row's order are kept. Morellonomicon's C (a champion's bottom 55 % of a rarity) is split here by the games, into the overlay's
+B 可考慮 (about the champion's average or better), C 不合 (clearly worse) and D 垃圾 (far worse, or an augment clearly worse
+on nearly every champion); only the letter leaves, never the number. Standard library only.
 """
 import argparse
 import json
@@ -17,6 +19,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "src" / "data" / "game-data.json"
 TIERS = "SABC"
+# Morellonomicon's C rows, by the row's value (the augment's result on the champion against the champion's own, a share):
+FINE = -0.02        # above this, about as good as the champion's average: 可考慮 (B)
+TRASH = -0.05       # at or below this, far worse: 垃圾 (D); in between 不合 (C)
+TRASH_SHARE = 0.9   # an augment clearly worse (FINE or below) in this share of all lists is 垃圾 wherever it is clearly worse
 
 
 def frontmatter(path):
@@ -42,7 +48,29 @@ def tier_rows(data, style):
     if data.get("format", 1) < 2:
         return style["tiers"]
     reasons = data["reasons"]
-    return [{"id": r[0], "tier": r[1], "reason": reasons[r[4]], "when": r[5] if len(r) > 5 else ""} for r in style["tiers"]]
+    return [{"id": r[0], "tier": r[1], "value": r[2], "reason": reasons[r[4]], "when": r[5] if len(r) > 5 else ""} for r in style["tiers"]]
+
+
+def grade(row, trash_ids):
+    """The overlay's letter for a row: S, A and B stay; a C becomes B, C or D by its value (see FINE, TRASH)."""
+    if row["tier"] != "C" or "value" not in row:
+        return row["tier"]
+    v = row["value"]
+    if v > FINE:
+        return "B"
+    return "D" if v <= TRASH or row["id"] in trash_ids else "C"
+
+
+def trash_augments(data):
+    """The augments clearly worse (value FINE or below) in TRASH_SHARE of every champion's lists, or more."""
+    seen, bad = {}, {}
+    for styles in data["champions"].values():
+        for st in styles.values():
+            for r in tier_rows(data, st):
+                if "value" in r:
+                    seen[r["id"]] = seen.get(r["id"], 0) + 1
+                    bad[r["id"]] = bad.get(r["id"], 0) + (r["value"] <= FINE)
+    return {i for i, n in seen.items() if n >= 50 and bad[i] / n >= TRASH_SHARE}
 
 
 def main():
@@ -104,6 +132,7 @@ def main():
 
     ROLE = {"坦克": "tank", "戰士": "fighter", "法師": "mage", "射手": "marksman", "刺客": "assassin", "輔助": "support"}
 
+    trash = trash_augments(data)
     champions = {}
     for cid, styles in sorted(data["champions"].items()):
         note = champ_notes.get(cid, {})
@@ -112,7 +141,7 @@ def main():
         ver = dd_version(note.get("icon", ""))
         b = (builds.get(cid) or {}).get("styles") or []
         item = lambda i: {"id": i, "name": item_names.get(i, ""), "icon": f"https://ddragon.leagueoflegends.com/cdn/{ver}/img/item/{i}.png" if ver else ""}
-        tiers = {key: [[r["id"], r["tier"], r.get("reason", ""), r.get("when", "")] for r in tier_rows(data, st) if r.get("tier") in TIERS]
+        tiers = {key: [[r["id"], grade(r, trash), r.get("reason", ""), r.get("when", "")] for r in tier_rows(data, st) if r.get("tier") in TIERS]
                  for key, st in styles.items()}   # each list already in the order Morellonomicon ranks them
 
         def build_damage(st):
