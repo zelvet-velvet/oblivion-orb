@@ -29,6 +29,7 @@ describe("rankOffers", () => {
     expect(v.map((x) => x.label)).toEqual(["可考慮", "頭獎！", "不合"]);
     expect(v.map((x) => x.best)).toEqual([false, true, false]);
     expect(v.map((x) => x.reroll)).toEqual([false, false, true]);
+    expect(v.map((x) => x.tryReroll)).toEqual([true, false, false]);
     expect(v[1].why).toBe("技能增傷，Q 吃得到");
   });
 
@@ -63,7 +64,7 @@ describe("rankOffers", () => {
   });
 
   it("never tags a reroll when the button is gone", () => {
-    expect(rankOffers(data, "DrMundo", S, [offer(1), offer(4, false)]).some((x) => x.reroll)).toBe(false);
+    expect(rankOffers(data, "DrMundo", S, [offer(1), offer(4, false), offer(3, false)]).some((x) => x.reroll || x.tryReroll)).toBe(false);
   });
 
   it("says when a card or a champion is unknown, without guessing", () => {

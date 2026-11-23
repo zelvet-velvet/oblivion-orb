@@ -18,7 +18,8 @@ export interface Verdict {
   label: string;
   why: string;
   best: boolean;
-  reroll: boolean;
+  reroll: boolean;            // 不合 or 垃圾 with its reroll button there: 建議重骰
+  tryReroll: boolean;         // 可考慮 with its reroll button there: 可試重骰, the player's call
 }
 
 export function styleOf(data: GameData, champion: string | null, key: string | null): StyleData | null {
@@ -39,7 +40,7 @@ export function shortWhy(why: string, max = 8): string {
  * One verdict per offer. Best (the frame): the highest tier, ties broken by Morellonomicon's order (the offers share a
  * rarity, so the order compares them); when every card is 不合 or 垃圾 only once no card can be rerolled any more, as the
  * pick to make anyway. Reroll: every 不合 and 垃圾 card whose reroll button is there; 頭獎！, 首選 and 可考慮 are the player's
- * call. A reroll left unused is lost at the end of the round, so there is no reason to keep one.
+ * call, though a 可考慮 card gets a softer tag (可試重骰). A reroll left unused is lost at the end of the round, so there is no reason to keep one.
  */
 export function rankOffers(
   data: GameData, champion: string | null, settings: Settings,
@@ -53,15 +54,15 @@ export function rankOffers(
   const out: Verdict[] = offers.map(({ id, shard }) => {
     if (shard !== undefined) {   // a 能力值加成 card: rated from the style's role and damage, not from Morellonomicon
       const name = shard ? SHARD_NAME[shard] : "能力值碎片";
-      if (!shard) return { id, name, tier: null, label: "未評分", why: "還沒有這種碎片的分級", best: false, reroll: false };
-      if (!style) return { id, name, tier: null, label: "未評分", why: "還沒有這隻英雄的資料", best: false, reroll: false };
+      if (!shard) return { id, name, tier: null, label: "未評分", why: "還沒有這種碎片的分級", best: false, reroll: false, tryReroll: false };
+      if (!style) return { id, name, tier: null, label: "未評分", why: "還沒有這隻英雄的資料", best: false, reroll: false, tryReroll: false };
       const [tier, why] = shardTier(shard, style.role, style.damage);
-      return { id, name, tier, label: VERDICT[tier], why, best: false, reroll: false };
+      return { id, name, tier, label: VERDICT[tier], why, best: false, reroll: false, tryReroll: false };
     }
     const r = id != null && settings.useTiers ? row.get(id) : undefined;
-    if (id == null) return { id, tier: null, label: "未辨識", why: "還沒看到這張卡", best: false, reroll: false };
-    if (!r) return { id, tier: null, label: "未評分", why: style ? "這隻英雄還沒有這張的分級" : "還沒有這隻英雄的資料", best: false, reroll: false };
-    return { id, tier: r.tier, label: VERDICT[r.tier], why: r.why, best: false, reroll: false };
+    if (id == null) return { id, tier: null, label: "未辨識", why: "還沒看到這張卡", best: false, reroll: false, tryReroll: false };
+    if (!r) return { id, tier: null, label: "未評分", why: style ? "這隻英雄還沒有這張的分級" : "還沒有這隻英雄的資料", best: false, reroll: false, tryReroll: false };
+    return { id, tier: r.tier, label: VERDICT[r.tier], why: r.why, best: false, reroll: false, tryReroll: false };
   });
 
   const key = (i: number) => {
@@ -73,7 +74,11 @@ export function rankOffers(
   if (rated.length === 0) return out;
   const sorted = [...rated].sort((a, b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1]);
 
-  for (const i of rated) if (offers[i].canReroll && BAD.includes(out[i].tier!)) out[i].reroll = true;
+  for (const i of rated) {
+    if (!offers[i].canReroll) continue;
+    if (BAD.includes(out[i].tier!)) out[i].reroll = true;
+    else if (out[i].tier === "B") out[i].tryReroll = true;
+  }
   const top = sorted[0];
   if (!BAD.includes(out[top].tier!) || !out.some((v) => v.reroll)) out[top].best = true;
   return out;

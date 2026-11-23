@@ -265,9 +265,10 @@ export function render(root: HTMLElement, v: View): void {
         html += nameplate(o, vd, motion(`np:${i}:${what}`, rerolled ? "flip" : "fade", rerolled ? FLIP : FADE),
                           motion(`glow:${i}:${what}`, rerolled ? "glow-late" : "fade", rerolled ? FLIP : FADE));
       // the tag hangs where the game's tooltip opens, so it hides while a card is hovered
-      if (vd.reroll && o.reroll && st.hover == null) {
+      if ((vd.reroll || vd.tryReroll) && o.reroll && st.hover == null) {
         const tw = 156, th = 42, x = o.reroll.x + o.reroll.w / 2 - tw / 2, y = o.reroll.y + o.reroll.h + 4;
-        html += box(x, y, tw, th, "deco tag", "", motion(`tag:${i}`, "fade", FADE)) + rerollTag(tw, th) + `<span>↻ 建議重骰</span></div>`;
+        html += box(x, y, tw, th, `deco tag${vd.reroll ? "" : " soft"}`, "", motion(`tag:${i}`, "fade", FADE)) + rerollTag(tw, th, !vd.reroll)
+          + `<span>${vd.reroll ? "↻ 建議重骰" : "↻ 可試重骰"}</span></div>`;
       }
     });
     // the game's tooltip may open above the cards too (a long text): the banner shows only while Shift is held

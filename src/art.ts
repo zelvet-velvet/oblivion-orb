@@ -90,8 +90,9 @@ export function hextechFrame(w: number, h: number, m = 34): string {
 }
 
 /** The ember tag hanging under the reroll worth taking, its notch pointing up at the button. */
-export function rerollTag(w = 156, h = 42): string {
-  const TAG = "#B8400F", EDGE = "#FF9A55";
+export function rerollTag(w = 156, h = 42, soft = false): string {
+  // soft: the 可考慮 card's "worth a try", an ember outline on the dark plate rather than the solid ember of 建議重骰
+  const [TAG, EDGE] = soft ? ["#1E1712", "#C8743F"] : ["#B8400F", "#FF9A55"];
   return svg(w, h,
     `<path d="M${w / 2 - 9},9 L${w / 2},0 L${w / 2 + 9},9" fill="${TAG}" stroke="${EDGE}" stroke-width="1.5"/>`
     + `<rect x=".75" y="8.75" width="${w - 1.5}" height="${h - 9.5}" rx="6" fill="${TAG}" stroke="${EDGE}" stroke-width="1.5"/>`
