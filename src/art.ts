@@ -14,15 +14,16 @@ export const AP_COL = "#8B7CFF";
 export const AD_COL = "#FF8C34";
 export const DMG: Record<Damage, [string, string]> = { phys: ["物理", AD_COL], magic: ["魔法", AP_COL] };
 
-/** The rarity metal of each tier (S prismatic, A and B gold, C dim silver): frame stops, inner edge, letter, face. */
+/** The rarity metal of each tier (S prismatic, A and B gold, C dim silver, D rust): frame stops, inner edge, letter, face. */
 export const METAL: Record<Tier, { stops: [number, string][]; edge: string; ink: string; face: string; glow: [string, number, number] }> = {
   S: { stops: [[0, "#F6C6FF"], [0.33, "#B9A4FF"], [0.66, "#8FE3FF"], [1, "#F9E7A8"]], edge: "#FFFFFF", ink: "#EBDDFF", face: "#17112A", glow: ["#C9A8FF", 0.85, 12] },
   A: { stops: [[0, "#FBE3A0"], [0.5, "#C9963E"], [1, "#F2CF7E"]], edge: "#FFF4D0", ink: "#F7D688", face: "#1D150A", glow: ["#F2C66A", 0.55, 9] },
   B: { stops: [[0, "#E8C77E"], [0.5, "#A87A2E"], [1, "#D9B064"]], edge: "#F6E2B0", ink: "#E2BC6C", face: "#1A1309", glow: ["#E2B060", 0.45, 8] },
   C: { stops: [[0, "#8C949C"], [0.5, "#565D64"], [1, "#7A8189"]], edge: "#AEB5BC", ink: "#9AA2AA", face: "#14171B", glow: ["#9AA2AA", 0.25, 6] },
+  D: { stops: [[0, "#9A6A58"], [0.5, "#5A3328"], [1, "#84594A"]], edge: "#C08A74", ink: "#C98A70", face: "#170E0B", glow: ["#B0604A", 0.25, 6] },
 };
-export const VERDICT_INK: Record<Tier, string> = { S: "#FFFFFF", A: "#FFF1CC", B: "#F7E6BE", C: "#C3C9CF" };
-export const WHY_INK: Record<Tier, string> = { S: "#E3D4FF", A: "#E8D3A0", B: "#D9C394", C: "#9AA2AA" };
+export const VERDICT_INK: Record<Tier, string> = { S: "#FFFFFF", A: "#FFF1CC", B: "#F7E6BE", C: "#C3C9CF", D: "#E8BBA8" };
+export const WHY_INK: Record<Tier, string> = { S: "#E3D4FF", A: "#E8D3A0", B: "#D9C394", C: "#9AA2AA", D: "#B98A78" };
 export const EMBER_TXT = "#FFB27A";
 
 let uid = 0;

@@ -1,6 +1,6 @@
 // The 能力值加成 cards: stat shards (魔法攻擊碎片 +15 魔攻, 不屈碎片 +10 物防 +10 魔防, …) the game offers between augment
 // picks. They are no augments, so Morellonomicon has no tier for them; they are rated here from the play style's role and
-// damage type: a stat the style's build is made of is 很合, one it can use 還行, one it never uses 不合. Never S: a shard is
+// damage type: a stat the style's build is made of is 首選, one it can use 可考慮, one it never uses 不合. Never S: a shard is
 // a few points of one stat.
 
 import type { Damage, Role, Tier } from "./types";

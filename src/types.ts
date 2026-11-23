@@ -3,7 +3,8 @@
 
 import type { Stat } from "./shards";
 
-export type Tier = "S" | "A" | "B" | "C";
+/** S 頭獎！, A 首選, B 可考慮, C 不合, D 垃圾 (tools/build_data.py splits Morellonomicon's C into B, C and D) */
+export type Tier = "S" | "A" | "B" | "C" | "D";
 export type Rarity = "銀" | "金" | "稜鏡";
 export type Mode = "穩" | "均衡" | "貪";
 
@@ -33,7 +34,6 @@ export interface Settings {
   mode: Mode;
   useTiers: boolean;          // 英雄的強化分級
   useSynergy: boolean;        // 和已拿強化搭配 (no data yet)
-  rerollBelow: Tier;          // tiers below this one may be marked for a reroll
   showHint: boolean;          // 怎麼玩、核心裝 (the right panel)
   onlyOnShift: boolean;       // the verdicts show only while Shift is held
   itemSets: boolean;          // write the champion's builds into the client as item sets (the shop's recommended tab)
@@ -44,7 +44,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   styleKey: null, mode: "均衡", useTiers: true, useSynergy: true,
-  rerollBelow: "B", showHint: true, onlyOnShift: false, itemSets: true, panelScale: 1, panelOffsets: {},
+  showHint: true, onlyOnShift: false, itemSets: true, panelScale: 1, panelOffsets: {},
 };
 
 // ---- the data built by tools/build_data.py from Morellonomicon ----

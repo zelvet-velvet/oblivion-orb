@@ -1,11 +1,15 @@
 // Ranks the offered augments for the champion and play style. Tiers, verdicts and reasons only: no win rates exist here
-// (tools/build_data.py keeps none). It marks the best card and, at most, one card worth rerolling; the player decides.
+// (tools/build_data.py keeps none). Each card gets its own verdict, so several can share one (two 首選, three 垃圾); it frames the
+// best card and tags every 不合 and 垃圾 card that can still be rerolled. The player decides.
 
 import { SHARD_NAME, shardTier, type Stat } from "./shards";
 import type { GameData, Settings, StyleData, Tier } from "./types";
 
-export const TIER_ORDER: Tier[] = ["S", "A", "B", "C"];
-export const VERDICT: Record<Tier, string> = { S: "最合", A: "很合", B: "還行", C: "不合" };
+export const TIER_ORDER: Tier[] = ["S", "A", "B", "C", "D"];
+/** S a game changer for this champion; A a pick to take; B fine, take it or reroll; C a poor fit; D trash */
+export const VERDICT: Record<Tier, string> = { S: "頭獎！", A: "首選", B: "可考慮", C: "不合", D: "垃圾" };
+/** The verdicts that ask for a reroll. */
+const BAD: Tier[] = ["C", "D"];
 
 export interface Verdict {
   id: number | null;
@@ -32,9 +36,10 @@ export function shortWhy(why: string, max = 8): string {
 }
 
 /**
- * One verdict per offer. Best: the highest tier, ties broken by Morellonomicon's order; none when nothing is above C.
- * Reroll: the weakest card below `settings.rerollBelow`, only when its reroll button is there. A reroll left unused is
- * lost at the end of the round, so there is no reason to keep one.
+ * One verdict per offer. Best (the frame): the highest tier, ties broken by Morellonomicon's order (the offers share a
+ * rarity, so the order compares them); when every card is 不合 or 垃圾 only once no card can be rerolled any more, as the
+ * pick to make anyway. Reroll: every 不合 and 垃圾 card whose reroll button is there; 頭獎！, 首選 and 可考慮 are the player's
+ * call. A reroll left unused is lost at the end of the round, so there is no reason to keep one.
  */
 export function rankOffers(
   data: GameData, champion: string | null, settings: Settings,
@@ -68,11 +73,8 @@ export function rankOffers(
   if (rated.length === 0) return out;
   const sorted = [...rated].sort((a, b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1]);
 
+  for (const i of rated) if (offers[i].canReroll && BAD.includes(out[i].tier!)) out[i].reroll = true;
   const top = sorted[0];
-  if (out[top].tier !== "C") out[top].best = true;
-
-  const below = (t: Tier) => rankOf(t) > rankOf(settings.rerollBelow);
-  const worst = [...sorted].reverse().find((i) => offers[i].canReroll && below(out[i].tier!) && !out[i].best);
-  if (worst !== undefined) out[worst].reroll = true;
+  if (!BAD.includes(out[top].tier!) || !out.some((v) => v.reroll)) out[top].best = true;
   return out;
 }

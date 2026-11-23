@@ -194,9 +194,8 @@ function banner(v: View, vd: Verdict): string {
 
 function settingsPanel(s: Settings): string {
   const W = 640, X = 960 - W / 2, Y = 196;
-  const rows: [string, keyof Settings | null, "toggle" | "seg" | "size" | null][] = [
+  const rows: [string, keyof Settings | null, "toggle" | "size" | null][] = [
     ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
-    ["可重骰門檻", null, null], ["rerollBelow", "rerollBelow", "seg"],
     ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["只在按住 Shift 時顯示建議", "onlyOnShift", "toggle"],
     ["商店", null, null], ["選角時把出裝寫進商店的物品組合", "itemSets", "toggle"]];
   let y = 96, body = "";
@@ -208,12 +207,6 @@ function settingsPanel(s: Settings): string {
         const on = Math.abs(s.panelScale - k) < 0.01;
         body += `<button class="seg-b${on ? " on" : ""}" data-act="setting" data-key="panelScale" data-value="${k}" data-num data-hit>${plate(54, 40, on ? TEAL : GOLD, on ? 0.9 : 0.65)}<span>${word}</span></button>`;
       }
-      body += `</div></div>`;
-    } else if (kind === "seg") {
-      const all: Tier[] = ["S", "A", "B", "C"], below = s.rerollBelow, worse = all.slice(all.indexOf(below) + 1);
-      body += `<div class="abs s-row" style="top:${y}px"><span>${worse.length ? `${worse.join("、")} 級標成可重骰` : "不標可重骰"}</span><div class="seg">`;
-      for (const t of all)
-        body += `<button class="seg-b${t === below ? " on" : ""}" data-act="setting" data-key="rerollBelow" data-value="${t}" data-hit>${plate(54, 40, t === below ? TEAL : GOLD, t === below ? 0.9 : 0.65)}<span>${t}</span></button>`;
       body += `</div></div>`;
     } else {
       const on = Boolean(s[key!]);
