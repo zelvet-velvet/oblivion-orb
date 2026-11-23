@@ -198,7 +198,8 @@ const CHOICES = {
 } as const;
 
 function settingsPanel(s: Settings): string {
-  const W = 640, X = 960 - W / 2, Y = 196;
+  const [dx, dy] = s.panelOffsets.settings ?? [0, 0];
+  const W = 640, X = 960 - W / 2 + dx, Y = 196 + dy;
   const rows: [string, keyof Settings | null, "toggle" | "size" | "choice" | null][] = [
     ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
     ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["建議標示", "marks", "choice"], ["可考慮的卡", "friends", "choice"],
@@ -230,6 +231,7 @@ function settingsPanel(s: Settings): string {
   const H = y + 12 + 72 + 20;
   return `<div class="abs veil-all" data-act="close-settings" data-hit></div>`
     + box(X, Y, W, H, "plate settings", "", motion("settings", "fade", FADE)) + plate(W, H)
+    + `<div class="abs drag" style="left:0;top:0;width:${W - 72}px;height:88px" data-drag="settings" data-hit title="拖曳移動，按兩下回到原位"></div>`
     + `<div class="abs s-title">建議邏輯</div><div class="abs s-sub">選強化時隨時可改，馬上重排；按 Esc 關閉</div>`
     + `<button class="abs s-close" data-act="close-settings" data-hit aria-label="關閉">✕</button>` + body + `</div>`;
 }

@@ -43,7 +43,7 @@ export interface Settings {
   itemSets: boolean;          // write the champion's builds into the client as item sets (the shop's recommended tab)
   panelScale: number;         // the side panels' size (1: as drawn; they still shrink to fit beside four cards at 1)
   /** where the player dragged the side panels: [dx, dy] from their place beside the cards, in 1920 × 1080 pixels */
-  panelOffsets: { left?: [number, number]; right?: [number, number]; toggle?: [number, number] };
+  panelOffsets: { left?: [number, number]; right?: [number, number]; toggle?: [number, number]; settings?: [number, number] };
 }
 
 export const DEFAULT_SETTINGS: Settings = {

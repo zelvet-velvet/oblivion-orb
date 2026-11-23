@@ -92,7 +92,7 @@ function act(a: Action) {
   switch (a.type) {
     case "pick-style": settings = { ...settings, styleKey: a.key }; break;
     case "mode": settings = { ...settings, mode: a.mode }; break;
-    case "open-settings": ui.settingsOpen = true; break;
+    case "open-settings": ui.settingsOpen = true; state = { ...state, hover: null }; break;
     case "close-settings": ui.settingsOpen = false; break;
     case "setting": settings = { ...settings, [a.key]: a.value }; break;
   }
@@ -116,7 +116,7 @@ addEventListener("keydown", (e) => {
 });
 
 // dragging a side panel by its title row; double-click puts it back beside the cards
-type PanelKey = "left" | "right" | "toggle";
+type PanelKey = "left" | "right" | "toggle" | "settings";
 let drag: { key: PanelKey; x: number; y: number; from: [number, number] } | null = null;
 stage.addEventListener("pointerdown", (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>("[data-drag]");
@@ -163,6 +163,8 @@ interface PickCard { name: string; card: Rect; reroll: Rect | null }
 interface Pick { open: boolean; cards: PickCard[] }
 const byKey = new Map(Object.entries(data.champions).map(([id, c]) => [c.key, id]));
 const matchName = makeNameMatcher(data.augments);
+/** Whether a point (window CSS pixels) is on the open settings or one of the overlay's own controls and panels. */
+const overOurs = (x: number, y: number) => ui.settingsOpen || !!document.elementFromPoint(x, y)?.closest("[data-hit]");
 /** A rect in the window's CSS pixels, into the 1920 × 1080 frame the overlay draws in. */
 const toFrame = (r: Rect): Rect => ({ x: (r.x - offX) / scale, y: (r.y - offY) / scale, w: r.w / scale, h: r.h / scale });
 
@@ -203,7 +205,8 @@ if (inApp) {
     await listen<Rect | null>("shop", ({ payload: r }) => setState({ ...state, shop: r ? toFrame(r) : null }));
     await listen<Pointer>("pointer", ({ payload: p }) => {
       const x = (p.x - offX) / scale, y = (p.y - offY) / scale;
-      const i = state.offers.findIndex((o) => x >= o.card.x && x <= o.card.x + o.card.w && y >= o.card.y && y <= o.card.y + o.card.h);
+      // over the settings or one of our panels the game gets no mouse, so opens no tooltip: no card counts as hovered
+      const i = overOurs(p.x, p.y) ? -1 : state.offers.findIndex((o) => x >= o.card.x && x <= o.card.x + o.card.w && y >= o.card.y && y <= o.card.y + o.card.h);
       const hover = i >= 0 ? i : null;   // the game opens its tooltip on plain hover, so we follow it too
       if (p.shift !== state.shift || hover !== state.hover) setState({ ...state, shift: p.shift, hover });
     });
@@ -240,7 +243,7 @@ if (inApp) {
   addEventListener("blur", () => setShift(false));
   addEventListener("mousemove", (e) => {
     const x = (e.clientX - offX) / scale, y = (e.clientY - offY) / scale;
-    const i = state.offers.findIndex((o) => x >= o.card.x && x <= o.card.x + o.card.w && y >= o.card.y && y <= o.card.y + o.card.h);
+    const i = overOurs(e.clientX, e.clientY) ? -1 : state.offers.findIndex((o) => x >= o.card.x && x <= o.card.x + o.card.w && y >= o.card.y && y <= o.card.y + o.card.h);
     const hover = i < 0 ? null : i;
     if (hover !== state.hover) setState({ ...state, hover });
   });
