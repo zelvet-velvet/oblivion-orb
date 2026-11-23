@@ -31,7 +31,8 @@ fn write_item_sets(diag: tauri::State<'_, Arc<diag::Diag>>, sets: Vec<serde_json
 pub fn run() {
     tauri::Builder::default()
         .manage(pointer::HitRegions::default())
-        .invoke_handler(tauri::generate_handler![pointer::set_hit_regions, page_log, write_item_sets])
+        .manage(reader::Unread::default())
+        .invoke_handler(tauri::generate_handler![pointer::set_hit_regions, reader::set_unread, page_log, write_item_sets])
         .setup(|app| {
             let win = app.get_webview_window("main").expect("the main window");
             // cover the primary screen (the game, borderless); clicks pass through until the cursor is over a control

@@ -10,7 +10,7 @@
 
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
@@ -81,6 +81,28 @@ impl Shot {
         let (r, g, b) = self.at(x, y);
         0.3 * r + 0.59 * g + 0.11 * b
     }
+    /// The card's name line for the OCR, in one of NAME_VARIANTS ways (a reread of a name the page could not match tries
+    /// the next): 0 twice the size; 1 three times; 2 a taller box, three times, as dark letters on white.
+    fn name_image(&self, x: i32, y: i32, w: i32, h: i32, k: f64, variant: usize) -> (Vec<u8>, i32, i32) {
+        match variant {
+            0 => self.crop(x, y, w, h, 2),
+            1 => self.crop(x, y, w, h, 3),
+            _ => {
+                let pad = (14.0 * k) as i32;
+                let (mut img, ow, oh) = self.crop(x, y - pad, w, h + 2 * pad, 3);
+                for p in img.chunks_exact_mut(4) {
+                    let lum = 0.3 * p[2] as f32 + 0.59 * p[1] as f32 + 0.11 * p[0] as f32;
+                    let v = if lum >= 120.0 { 0 } else { 255 };
+                    p[0] = v;
+                    p[1] = v;
+                    p[2] = v;
+                    p[3] = 255;
+                }
+                (img, ow, oh)
+            }
+        }
+    }
+
     /// A part of the shot, scaled by `k` (nearest), as BGRA for the OCR.
     fn crop(&self, x: i32, y: i32, w: i32, h: i32, k: i32) -> (Vec<u8>, i32, i32) {
         let (ow, oh) = (w * k, h * k);
@@ -211,8 +233,6 @@ fn reroll_usable(shot: &Shot, r: Rect) -> bool {
 /// (163, 132, 81 at 1080p) over 1000 pixels long, and its bottom edge a dark gold row (66, 48, 16) further down, over the
 /// same columns. Nothing in the game's map draws lines like that. Returns the shop's rect in screen pixels.
 fn find_shop(shot: &Shot, k: f64) -> Option<Rect> {
-    let gold = |(r, g, b): (f32, f32, f32)| (140.0..=200.0).contains(&r) && (110.0..=175.0).contains(&g) && (60.0..=115.0).contains(&b) && r > g && g > b;
-    let dark = |(r, g, b): (f32, f32, f32)| (40.0..=95.0).contains(&r) && (28.0..=70.0).contains(&g) && b <= 35.0 && r > g && g > b;
     let step = 4;
     let need = (600.0 * k) as i32; // a run this long (HUD scales smaller than 100% make the shop smaller)
     for y in 0..shot.h {
@@ -243,6 +263,26 @@ fn find_shop(shot: &Shot, k: f64) -> Option<Rect> {
         }
     }
     None
+}
+
+fn gold((r, g, b): (f32, f32, f32)) -> bool {
+    (140.0..=200.0).contains(&r) && (110.0..=175.0).contains(&g) && (60.0..=115.0).contains(&b) && r > g && g > b
+}
+
+fn dark((r, g, b): (f32, f32, f32)) -> bool {
+    (40.0..=95.0).contains(&r) && (28.0..=70.0).contains(&g) && b <= 35.0 && r > g && g > b
+}
+
+/// Whether the shop is still (or again) at `r`, a rect find_shop gave: two one-pixel rows, its gold top edge and its dark
+/// gold bottom edge. Cheap enough to ask every 50 ms, so the panels follow the shop open and shut at once; the whole
+/// screen is searched only when the shop is not where it was.
+fn shop_at(r: Rect) -> bool {
+    let (x, w) = (r.x as i32, r.w as i32);
+    let (Some(top), Some(bottom)) = (capture(x, r.y as i32, w, 1), capture(x, (r.y + r.h) as i32 - 2, w, 1)) else { return false };
+    let xs: Vec<i32> = (0..w).step_by(4).collect();
+    let gold_share = xs.iter().filter(|&&dx| gold(top.at(x + dx, top.y))).count() as f32 / xs.len().max(1) as f32;
+    let dark_hits = (0..10).filter(|i| dark(bottom.at(x + w * (2 * i + 1) / 20, bottom.y))).count();
+    gold_share >= 0.85 && dark_hits >= 8
 }
 
 /// A small brightness signature of a card's icon area, to see when a card changes (a reroll).
@@ -290,6 +330,35 @@ pub fn exclude_from_capture(app: &AppHandle, diag: &Diag) {
     let _ = (app, diag);
 }
 
+/// The cards of the open pick the page could not match to an augment (or a shard), by index: the reader reads those
+/// again, another way each time (Shot::name_image), until the page matches them.
+#[derive(Default)]
+pub struct Unread(Mutex<Vec<bool>>);
+
+/// Called by the page after each "pick" it matched.
+#[tauri::command]
+pub fn set_unread(state: tauri::State<'_, Unread>, cards: Vec<bool>) {
+    *state.0.lock().unwrap() = cards;
+}
+
+const NAME_VARIANTS: usize = 3;
+const REREAD: Duration = Duration::from_millis(300); // a name the page could not match is read again this often
+
+/// One card of the open pick, as the reader follows it.
+struct Slot {
+    prev: Vec<f32>,      // the icon's signature in the last look: a card that changed since is still moving (a reroll's flip)
+    read_sig: Vec<f32>,  // the signature when the name was read
+    name: String,
+    variant: usize,      // the name_image way of the last read
+    read_at: Instant,
+}
+
+impl Slot {
+    fn new() -> Slot {
+        Slot { prev: Vec::new(), read_sig: Vec::new(), name: String::new(), variant: 0, read_at: Instant::now() }
+    }
+}
+
 pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
     thread::spawn(move || {
         let ocr = Ocr::new();
@@ -299,22 +368,24 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
             "ocr: NOT available: add 中文(繁體，台灣) in Windows Settings > Time & language > Language & region, with its optical character recognition feature; the cards cannot be named until then"
         });
         let mut open: Option<usize> = None; // the card count of the open pick
-        let mut sigs: Vec<Vec<f32>> = Vec::new();
-        let mut names: Vec<String> = Vec::new();
+        let mut slots: Vec<Slot> = Vec::new();
         let mut last: Option<Pick> = None;
         let mut last_sent = Instant::now();
         let mut last_look = Instant::now().checked_sub(Duration::from_secs(60)).unwrap_or_else(Instant::now); // the "look" line in the log, every 10 s
         let mut screen_logged = (0.0, 0.0, 0.0);
         let mut raised = Instant::now().checked_sub(Duration::from_secs(60)).unwrap_or_else(Instant::now);
         let mut shop: Option<Rect> = None; // the shop window while it is open
+        let mut shop_last: Option<Rect> = None; // where it was last seen: it opens there again unless the player dragged it
         let mut shop_look = Instant::now();
+        let mut cards_look = Instant::now();
         let close = |app: &AppHandle, diag: &Diag, why: &str| {
             diag.log(&format!("pick closed ({why})"));
             let _ = app.emit("pick", Pick { open: false, cards: vec![] });
         };
         loop {
             let reading = in_game.load(Ordering::Relaxed) || diag.test();
-            thread::sleep(Duration::from_millis(if reading { 200 } else { 1000 }));
+            // a tick of 50 ms in game: the shop's two edge rows each tick, the cards every 100 ms (a pick is open) or 200 ms
+            thread::sleep(Duration::from_millis(if reading { 50 } else { 1000 }));
             if !reading {
                 if open.take().is_some() {
                     close(&app, &diag, "the game is over");
@@ -340,24 +411,40 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
             let px = |v: f64| (ox + v * k).round() as i32;
             let py = |v: f64| (my + v * k).round() as i32;
             let css = |r: Rect| Rect { x: (r.x - mx) / scale, y: (r.y - my) / scale, w: r.w / scale, h: r.h / scale };
-            // the shop, five times a second while no pick is open (the panels follow it open and shut): a copy of the whole screen
-            if open.is_none() && shop_look.elapsed() >= Duration::from_millis(180) {
-                shop_look = Instant::now();
-                let found = capture(mx as i32, my as i32, sw as i32, sh as i32).and_then(|s| find_shop(&s, k));
-                let moved = |a: Rect, b: Rect| (a.x - b.x).abs() > 8.0 || (a.y - b.y).abs() > 8.0;
-                let changed = match (found, shop) {
-                    (Some(a), Some(b)) => moved(a, b),
-                    (a, b) => a.is_some() != b.is_some(),
-                };
-                if changed {
-                    diag.log(&match found {
-                        Some(r) => format!("shop open at ({:.0}, {:.0}), {:.0}x{:.0}", r.x, r.y, r.w, r.h),
-                        None => "shop closed".into(),
-                    });
-                    let _ = app.emit("shop", found.map(css));
+            // the shop while no pick is open (the panels follow it open and shut): each tick, its two edge rows where it was
+            // last seen; the whole screen when it is not there, at once when it just left (dragged, or shut) and every
+            // 200 ms while it is shut (opened somewhere new)
+            if open.is_none() {
+                let mut found = shop_last.filter(|&r| shop_at(r));
+                let mut looked = shop_last.is_some();
+                if found.is_none() && (shop.is_some() || shop_look.elapsed() >= Duration::from_millis(200)) {
+                    shop_look = Instant::now();
+                    found = capture(mx as i32, my as i32, sw as i32, sh as i32).and_then(|s| find_shop(&s, k));
+                    looked = true;
                 }
-                shop = found;
+                if looked {
+                    let moved = |a: Rect, b: Rect| (a.x - b.x).abs() > 8.0 || (a.y - b.y).abs() > 8.0;
+                    let changed = match (found, shop) {
+                        (Some(a), Some(b)) => moved(a, b),
+                        (a, b) => a.is_some() != b.is_some(),
+                    };
+                    if changed {
+                        diag.log(&match found {
+                            Some(r) => format!("shop open at ({:.0}, {:.0}), {:.0}x{:.0}", r.x, r.y, r.w, r.h),
+                            None => "shop closed".into(),
+                        });
+                        let _ = app.emit("shop", found.map(css));
+                    }
+                    shop = found;
+                    if found.is_some() {
+                        shop_last = found;
+                    }
+                }
             }
+            if cards_look.elapsed() < Duration::from_millis(if open.is_some() { 100 } else { 200 }) {
+                continue;
+            }
+            cards_look = Instant::now();
             // one copy round the widest pick (four cards) and the buttons
             let widest = card_xs(LAYOUTS[0]);
             let (x0, y0) = (px(widest[0]), py(CARD_Y));
@@ -404,8 +491,8 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
                 if let Some(n) = now_open {
                     diag.log(&format!("pick open: {n} cards"));
                     diag.save_bmp("pick-capture.bmp", shot.w, shot.h, &shot.px);
-                    sigs = vec![Vec::new(); n];
-                    names = vec![String::new(); n];
+                    slots = (0..n).map(|_| Slot::new()).collect();
+                    app.state::<Unread>().0.lock().unwrap().clear();
                 }
                 open = now_open;
             }
@@ -415,24 +502,36 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
                 raise(&app);
             }
 
+            let unread = app.state::<Unread>().0.lock().unwrap().clone();
             let mut cards = Vec::with_capacity(n);
             for (i, cx) in card_xs(n).into_iter().enumerate() {
                 let card = Rect { x: ox + cx * k, y: my + CARD_Y * k, w: CARD_W * k, h: CARD_H * k };
                 let rr = Rect { x: ox + (cx + REROLL_DX) * k, y: my + REROLL_Y * k, w: REROLL_W * k, h: REROLL_H * k };
-                let mid = px(cx + CARD_W / 2.0);
-                let sig = signature(&shot, mid, py(310.0), (170.0 * k) as i32);
-                if names[i].is_empty() || differs(&sig, &sigs[i]) {
+                let sig = signature(&shot, px(cx + CARD_W / 2.0), py(310.0), (170.0 * k) as i32);
+                let s = &mut slots[i];
+                // a card still moving (the pick fading in, a reroll's flip) is read once it holds still: a read mid-flip
+                // gives part of a name ("靈" for 靈活轉換) that would stay until the card changed again
+                let moving = differs(&sig, &s.prev);
+                s.prev = sig.clone();
+                let new_card = differs(&sig, &s.read_sig); // also the first look at a card (no signature read yet)
+                let unmatched = s.name.is_empty() || unread.get(i).copied().unwrap_or(false);
+                if !moving && (new_card || (unmatched && s.read_at.elapsed() >= REREAD)) {
                     if let Some(o) = &ocr {
-                        let (img, w, h) = shot.crop(px(cx + CARD_W / 2.0 - NAME_W / 2.0), py(NAME_Y), (NAME_W * k) as i32, (NAME_H * k) as i32, 2);
+                        let variant = if new_card { 0 } else { (s.variant + 1) % NAME_VARIANTS };
+                        let (img, w, h) = shot.name_image(px(cx + CARD_W / 2.0 - NAME_W / 2.0), py(NAME_Y), (NAME_W * k) as i32,
+                            (NAME_H * k) as i32, k, variant);
                         let read = o.read(&img, w, h);
-                        diag.log(&format!("card {}: ocr read \"{read}\"", i + 1));
-                        if !read.is_empty() {
-                            names[i] = read;
+                        diag.log(&format!("card {}: ocr read \"{read}\"{}", i + 1, if variant > 0 { format!(" (way {})", variant + 1) } else { String::new() }));
+                        // a new card's empty read clears the old name (it was another card's); a reread keeps the name it has
+                        if !read.is_empty() || new_card {
+                            s.name = read;
                         }
+                        s.variant = variant;
                     }
-                    sigs[i] = sig;
+                    s.read_sig = sig;
+                    s.read_at = Instant::now();
                 }
-                cards.push(Card { name: names[i].clone(), card: css(card), reroll: reroll_usable(&shot, rr).then(|| css(rr)) });
+                cards.push(Card { name: s.name.clone(), card: css(card), reroll: reroll_usable(&shot, rr).then(|| css(rr)) });
             }
             let pick = Pick { open: true, cards };
             let gist = |p: &Pick| p.cards.iter().map(|c| (c.name.clone(), c.reroll.is_some())).collect::<Vec<_>>();

@@ -175,8 +175,10 @@ if (inApp) {
       // the offers stay as they are until the card reader sends them
       setState({ ...state, phase: state.phase === "augment-pick" && r.phase === "in-game" ? state.phase : r.phase, champion });
     });
-    await listen<Pick>("pick", ({ payload: p }) => {
+    let lastUnread = "";
+    await listen<Pick>("pick", async ({ payload: p }) => {
       if (!p.open) {
+        lastUnread = "";
         if (state.phase === "augment-pick") setState({ ...state, phase: "in-game", offers: [], hover: null });
         return;
       }
@@ -186,6 +188,13 @@ if (inApp) {
                  card: toFrame(c.card), reroll: c.reroll ? toFrame(c.reroll) : null };
       });
       setState({ ...state, phase: "augment-pick", offers });
+      // the cards whose name matched nothing: the reader reads them again, another way each time, until one matches
+      const unread = offers.map((o) => (o.shard === undefined ? o.id == null : o.shard === null));
+      if (unread.join() !== lastUnread) {
+        lastUnread = unread.join();
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("set_unread", { cards: unread });
+      }
     });
     await listen<Rect | null>("shop", ({ payload: r }) => setState({ ...state, shop: r ? toFrame(r) : null }));
     await listen<Pointer>("pointer", ({ payload: p }) => {
