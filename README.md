@@ -9,7 +9,7 @@ Sibling of [Morellonomicon (黑魔禁書)](https://github.com/zelvet-velvet/More
 ## What it shows
 - **Play styles** on the left: pick one (Dr. Mundo: Q 消耗 · 穿透, 坦克, 坦克輸出) and the ranking follows it.
 - **The champion's special play** on top (Mundo: Q takes no AP, AD or health, so look for damage amps and penetration).
-- **Under each card**, a plate with its verdict and why: **頭獎！** (a game changer for this champion), **首選**, **可考慮**, **不合** or **垃圾** (far worse than the champion's other augments, or bad on nearly every champion). Several cards can share a verdict. The best card gets a line round it; every 不合 and 垃圾 card that can still be rerolled gets a reroll tag, a 可考慮 card gets a softer 可試重骰 tag (your call), and 首選 or 頭獎！ gets none.
+- **Under each card**, a plate with its verdict and why: **頭獎！** (a game changer for this champion), **首選**, **可考慮**, **不合** or **垃圾** (far worse than the champion's other augments, or bad on nearly every champion). Several cards can share a verdict. The best card gets a line round it; every 不合 and 垃圾 card that can still be rerolled gets a reroll tag, a 可考慮 card gets a softer 考慮重骰 tag (your call), and 首選 or 頭獎！ gets none.
 - **能力值加成 rounds** (stat shards such as 魔法攻擊碎片 or 不屈碎片): rated from the play style's role and damage type, as 首選, 可考慮 or 不合.
 - **The arrow tab** on the left edge in game opens or closes the panels at any time (drag it to move it). They open by themselves at a pick and while the shop is open (found wherever it was dragged), beside the cards or the shop, and close again after.
 - **Hovering a card** hides everything over the cards, so the game's tooltip is never covered; **hold Shift** over it for the card's verdict and full reason above the cards.

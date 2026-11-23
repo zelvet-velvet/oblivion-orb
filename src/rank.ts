@@ -19,7 +19,7 @@ export interface Verdict {
   why: string;
   best: boolean;
   reroll: boolean;            // 不合 or 垃圾 with its reroll button there: 建議重骰
-  tryReroll: boolean;         // 可考慮 with its reroll button there: 可試重骰, the player's call
+  tryReroll: boolean;         // 可考慮 with its reroll button there: 考慮重骰, the player's call
 }
 
 export function styleOf(data: GameData, champion: string | null, key: string | null): StyleData | null {
@@ -40,7 +40,7 @@ export function shortWhy(why: string, max = 8): string {
  * One verdict per offer. Best (the frame): the highest tier, ties broken by Morellonomicon's order (the offers share a
  * rarity, so the order compares them); when every card is 不合 or 垃圾 only once no card can be rerolled any more, as the
  * pick to make anyway. Reroll: every 不合 and 垃圾 card whose reroll button is there; 頭獎！, 首選 and 可考慮 are the player's
- * call, though a 可考慮 card gets a softer tag (可試重骰). A reroll left unused is lost at the end of the round, so there is no reason to keep one.
+ * call, though a 可考慮 card gets a softer tag (考慮重骰). A reroll left unused is lost at the end of the round, so there is no reason to keep one.
  */
 export function rankOffers(
   data: GameData, champion: string | null, settings: Settings,

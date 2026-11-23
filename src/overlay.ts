@@ -268,7 +268,7 @@ export function render(root: HTMLElement, v: View): void {
       if ((vd.reroll || vd.tryReroll) && o.reroll && st.hover == null) {
         const tw = 156, th = 42, x = o.reroll.x + o.reroll.w / 2 - tw / 2, y = o.reroll.y + o.reroll.h + 4;
         html += box(x, y, tw, th, `deco tag${vd.reroll ? "" : " soft"}`, "", motion(`tag:${i}`, "fade", FADE)) + rerollTag(tw, th, !vd.reroll)
-          + `<span>${vd.reroll ? "↻ 建議重骰" : "↻ 可試重骰"}</span></div>`;
+          + `<span>${vd.reroll ? "↻ 建議重骰" : "↻ 考慮重骰"}</span></div>`;
       }
     });
     // the game's tooltip may open above the cards too (a long text): the banner shows only while Shift is held
