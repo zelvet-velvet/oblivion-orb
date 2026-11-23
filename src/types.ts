@@ -52,7 +52,13 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 // ---- the data built by tools/build_data.py from Morellonomicon ----
-export interface AugmentInfo { name: string; rarity: Rarity | string; icon: string }
+export interface AugmentInfo {
+  name: string; rarity: Rarity | string; icon: string;
+  /** the verdict across all champions and its most common reason: shown as 通用 where the champion has no tier for it */
+  general?: [Tier, string];
+  /** why it has no tier anywhere (目前停用, 沒有對局資料) */
+  off?: string;
+}
 /** [augment id, tier, reason, when], in the order Morellonomicon ranks them for the style */
 export type TierRow = [number, Tier, string, string];
 export type Role = "tank" | "fighter" | "mage" | "marksman" | "assassin" | "support";

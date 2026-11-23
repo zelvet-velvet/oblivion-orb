@@ -3,7 +3,11 @@ import { rankOffers, shortWhy } from "./rank";
 import { DEFAULT_SETTINGS, type GameData } from "./types";
 
 const data: GameData = {
-  patch: "test", source: "test", augments: {},
+  patch: "test", source: "test",
+  augments: {
+    "7": { name: "通用卡", rarity: "金", icon: "", general: ["B", "大家都能用"] },
+    "8": { name: "停用卡", rarity: "金", icon: "", off: "目前停用" },
+  },
   champions: {
     DrMundo: {
       key: 36, name: "蒙多醫生", icon: "", play: [],
@@ -65,6 +69,16 @@ describe("rankOffers", () => {
 
   it("never tags a reroll when the button is gone", () => {
     expect(rankOffers(data, "DrMundo", S, [offer(1), offer(4, false), offer(3, false)]).some((x) => x.reroll || x.tryReroll)).toBe(false);
+  });
+
+  it("rates a card the champion has no tier for by its verdict across all champions, marked 通用", () => {
+    const v = rankOffers(data, "DrMundo", S, [offer(7), offer(4), offer(8)]);
+    expect(v[0]).toMatchObject({ tier: "B", label: "可考慮", why: "通用：大家都能用", general: true, tryReroll: true });
+    expect(v[0].best).toBe(true);
+    expect(v[2]).toMatchObject({ tier: null, label: "未評分", why: "目前停用" });
+    expect(rankOffers(data, "Nobody", S, [offer(7)])[0]).toMatchObject({ tier: "B", general: true });
+    // the champion's own 可考慮 goes before a 通用 one
+    expect(rankOffers(data, "DrMundo", S, [offer(7), offer(3)]).map((x) => x.best)).toEqual([false, true]);
   });
 
   it("says when a card or a champion is unknown, without guessing", () => {

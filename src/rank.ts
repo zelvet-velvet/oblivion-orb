@@ -18,6 +18,7 @@ export interface Verdict {
   label: string;
   why: string;
   best: boolean;
+  general?: boolean;          // the verdict across all champions (通用): the champion has no tier for this card
   reroll: boolean;            // 不合 or 垃圾 with its reroll button there: 建議重骰
   tryReroll: boolean;         // 可考慮 with its reroll button there: 問朋友 or 沒興趣 (設定), the player's call
 }
@@ -61,14 +62,20 @@ export function rankOffers(
     }
     const r = id != null && settings.useTiers ? row.get(id) : undefined;
     if (id == null) return { id, tier: null, label: "未辨識", why: "還沒看到這張卡", best: false, reroll: false, tryReroll: false };
-    if (!r) return { id, tier: null, label: "未評分", why: style ? "這隻英雄還沒有這張的分級" : "還沒有這隻英雄的資料", best: false, reroll: false, tryReroll: false };
+    if (!r) {   // the champion has no tier for it (never offered to it, or the champion is not known yet): the verdict across all
+      const g = settings.useTiers ? data.augments[String(id)]?.general : undefined;
+      if (g) return { id, tier: g[0], label: VERDICT[g[0]], why: `通用：${g[1] || "各英雄綜合"}`, general: true, best: false, reroll: false, tryReroll: false };
+      const off = data.augments[String(id)]?.off;
+      return { id, tier: null, label: "未評分", why: off ?? (style ? "這隻英雄還沒有這張的分級" : "還沒有這隻英雄的資料"), best: false, reroll: false, tryReroll: false };
+    }
     return { id, tier: r.tier, label: VERDICT[r.tier], why: r.why, best: false, reroll: false, tryReroll: false };
   });
 
   const key = (i: number) => {
     const v = out[i], id = v.id;
     if (v.tier == null) return [99, 1e9];
-    return [rankOf(v.tier), id == null ? i : row.get(id)!.order];   // shards: ties go to the leftmost
+    // shards and 通用 cards: after the champion's own rows of the same tier, ties to the leftmost
+    return [rankOf(v.tier), id == null || v.general ? 1e6 + i : row.get(id)!.order];
   };
   const rated = out.map((_, i) => i).filter((i) => out[i].tier != null);
   if (rated.length === 0) return out;
