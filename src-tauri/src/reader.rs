@@ -300,6 +300,10 @@ pub fn set_unread(state: tauri::State<'_, Unread>, cards: Vec<bool>) {
 }
 
 const NAME_VARIANTS: usize = 3;
+// the game's tooltip (on a card, or on an item in the shop) covers the edges the reader looks for: a pick or the shop
+// counts as gone only once it has stayed out of sight this long, so the panels never blink shut under a tooltip
+const PICK_GONE: Duration = Duration::from_millis(1000);
+const SHOP_GONE: Duration = Duration::from_millis(800);
 const REREAD: Duration = Duration::from_millis(300); // a name the page could not match is read again this often
 
 /// One card of the open pick, as the reader follows it.
@@ -337,6 +341,8 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, streaming: Arc<AtomicBool
         let mut shop_last: Option<Rect> = None; // where it was last seen: it opens there again unless the player dragged it
         let mut shop_look = Instant::now();
         let mut cards_look = Instant::now();
+        let mut pick_gone: Option<Instant> = None; // since when the open pick's frames are out of sight
+        let mut shop_gone: Option<Instant> = None; // since when the open shop is out of sight
         let close = |app: &AppHandle, diag: &Diag, why: &str| {
             diag.log(&format!("pick closed ({why})"));
             let _ = app.emit("pick", Pick { open: false, cards: vec![] });
@@ -382,6 +388,15 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, streaming: Arc<AtomicBool
                     looked = true;
                 }
                 if looked {
+                    // out of sight for a moment (a tooltip on an item): still open
+                    if found.is_none() && shop.is_some() {
+                        let since = *shop_gone.get_or_insert_with(Instant::now);
+                        if since.elapsed() < SHOP_GONE {
+                            found = shop;
+                        }
+                    } else {
+                        shop_gone = None;
+                    }
                     let moved = |a: Rect, b: Rect| (a.x - b.x).abs() > 8.0 || (a.y - b.y).abs() > 8.0;
                     let changed = match (found, shop) {
                         (Some(a), Some(b)) => moved(a, b),
@@ -442,6 +457,14 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, streaming: Arc<AtomicBool
                 Some(_) => None,
                 None => LAYOUTS.iter().copied().find(|&n| seen(n) == n),
             };
+            // frames out of sight for a moment (a tooltip, a hovered card): the pick stays open, its cards as they were
+            if open.is_some() && now_open.is_none() {
+                let since = *pick_gone.get_or_insert_with(Instant::now);
+                if since.elapsed() < PICK_GONE {
+                    continue;
+                }
+            }
+            pick_gone = None;
             if now_open != open {
                 if open.is_some() {
                     close(&app, &diag, "the frames are gone");
