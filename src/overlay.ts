@@ -71,6 +71,17 @@ function toggleButton(open: boolean, offset: [number, number] = [0, 0]): string 
     + `<path d="${arrow}" fill="none" stroke="#C8AA6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
 }
 
+/** The two side panels' shared frame: one width, one scale (so their text is the same size), one height and one top,
+ * the scale the one with less room needs. Each keeps its own drag offset. */
+const SIDE_W = 360;
+interface Side { k: number; fit: string; Y: number; H: number }
+function sideFrame(span: Span, size: number, heights: number[]): Side {
+  const room = Math.min(span.left - 28, 1920 - 12 - span.right - 16);
+  const [k, fit] = fitIn(room, SIDE_W, size);
+  const H = Math.max(...heights);
+  return { k, fit, H, Y: Math.max(120, Math.round((span.top + span.bottom) / 2 - H * k / 2)) };
+}
+
 /** The panel's title row: drag it to move the panel, double-click it to put the panel back beside the cards. */
 const dragHandle = (key: "left" | "right", w: number) =>
   `<div class="abs drag" style="left:0;top:0;width:${w}px;height:60px" data-drag="${key}" data-hit title="拖曳移動，按兩下回到原位"></div>`;
@@ -78,16 +89,20 @@ const dragHandle = (key: "left" | "right", w: number) =>
 // ---- left: 玩法 (the choice) ----
 // One tile per play style, a role and damage (AP 刺客, AD 戰士, 坦克): the choice that moves the augment ranking and the build on
 // the right. Most played first, each with how many play it; rare and losing ones marked.
-function leftPanel(v: View, champ: ChampionData, span: Span): string {
+const LEFT = { P: 14, TH: 64, GAP: 8 };
+function leftHeight(champ: ChampionData): number {
+  const rows = Math.ceil(champ.styles.length / 2);
+  return 68 + rows * LEFT.TH + (rows - 1) * LEFT.GAP + 12 + 20 + 16 + 26 + 40 + 20;
+}
+function leftPanel(v: View, champ: ChampionData, span: Span, side: Side): string {
   const style = styleOf(v.data, v.state.champion, v.settings.styleKey);
   const styles = champ.styles;
-  const W = 320, P = 14, TH = 64, GAP = 8, inner = W - 2 * P, half = Math.floor((inner - GAP) / 2);
+  const W = SIDE_W, { P, TH, GAP } = LEFT, inner = W - 2 * P, half = Math.floor((inner - GAP) / 2);
   const tileRows = Math.ceil(styles.length / 2), tilesH = tileRows * TH + (tileRows - 1) * GAP;
   const autoY = 68 + tilesH + 12, modeY = autoY + 20 + 16;
-  const H = modeY + 26 + 40 + 20;
-  const [k, fit] = fitIn(span.left - 28, W, v.settings.panelScale), X = Math.round(span.left - 16 - W * k);
+  const { k, fit, H } = side, X = Math.round(span.left - 16 - W * k);
   const [dx, dy] = v.settings.panelOffsets.left ?? [0, 0];
-  const Y = Math.max(k < 1 ? 200 : 120, Math.round((span.top + span.bottom) / 2 - H * k / 2)) + dy;
+  const Y = side.Y + dy;
   let s = box(X + dx, Y, W, H, "plate", "", fit + ";" + motion("left", "fade", FADE)) + plate(W, H) + dragHandle("left", W - P - 36 - 8)
     + `<div class="abs panel-title" style="left:${P}px">玩法</div>`
     + `<button class="abs gear" style="left:${W - P - 36}px;top:16px" data-act="open-settings" data-hit aria-label="建議邏輯">${plate(36, 36)}${gear(22)}</button>`;
@@ -123,14 +138,16 @@ function pathRows(st: StyleData | null): [string, (CoreItem | LateItem)[]][] {
   return rows.filter(([, items]) => items.length);
 }
 const PATH_H = 66, PATH_TALL = 84, PATH_GAP = 8;
-function rightPanel(champ: ChampionData, style: StyleData | null, span: Span, offset: [number, number] = [0, 0], size = 1): string {
-  const W = 360, P = 24;
-  const [k, fit] = fitIn(1920 - 12 - span.right - 16, W, size), X = span.right + 16;
+function rightHeight(champ: ChampionData, style: StyleData | null): number {
   const playH = champ.play.length ? champ.play.length * 56 + (champ.play.length - 1) * 14 : 0;
   const path = pathRows(style);
   const pathH = path.reduce((h, [, items]) => h + (items.some((it) => "need" in it) ? PATH_TALL : PATH_H), 0) + Math.max(0, path.length - 1) * PATH_GAP;
-  const H = 78 + (champ.play.length ? 30 + playH + 28 : 0) + (path.length ? 30 + pathH + 20 : 0) + 22 + 22;
-  const Y = Math.max(12, Math.round((span.top + span.bottom) / 2 - H * k / 2)) + offset[1];
+  return 78 + (champ.play.length ? 30 + playH + 28 : 0) + (path.length ? 30 + pathH + 20 : 0) + 22 + 22;
+}
+function rightPanel(champ: ChampionData, style: StyleData | null, span: Span, side: Side, offset: [number, number] = [0, 0]): string {
+  const W = SIDE_W, P = 24, { fit, H } = side, X = span.right + 16;
+  const path = pathRows(style);
+  const Y = side.Y + offset[1];
   let s = box(X + offset[0], Y, W, H, "plate", "", fit + ";" + motion("right", "fade", FADE)) + plate(W, H) + dragHandle("right", W) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
   let y = 78;
   if (champ.play.length) {
@@ -244,10 +261,8 @@ export function render(root: HTMLElement, v: View): void {
   const st = v.state;
   const champ = st.champion ? v.data.champions[st.champion] : undefined;
   const pick = st.phase === "augment-pick" && st.offers.length > 0;
-  // beside the cards at a pick; beside the shop (and its quick-buy column on the left) while it is open
-  const span = pick ? cardSpan(st.offers)
-    : st.shop ? { left: st.shop.x - 90, right: st.shop.x + st.shop.w, top: st.shop.y, bottom: st.shop.y + st.shop.h }
-    : cardSpan([]);
+  // beside the cards at a pick; otherwise (the shop open, too) where a pick's cards sit, so they never follow the shop
+  const span = cardSpan(pick ? st.offers : []);
   let html = "";
   const inGame = st.phase === "in-game" || st.phase === "augment-pick";
   const open = panelsOpen(st, v.ui);
@@ -258,9 +273,10 @@ export function render(root: HTMLElement, v: View): void {
   if (champ && ready && inGame) html += toggleButton(open, v.settings.panelOffsets.toggle);
   // the panels: in champ select; in game at each pick, in the shop, or when the toggle opened them
   if (champ && ready && open) {
-    html += leftPanel(v, champ, span);
     const chosen = styleOf(v.data, st.champion, v.settings.styleKey);
-    if (v.settings.showHint) html += rightPanel(champ, chosen, span, v.settings.panelOffsets.right, v.settings.panelScale);
+    const side = sideFrame(span, v.settings.panelScale, [leftHeight(champ), ...(v.settings.showHint ? [rightHeight(champ, chosen)] : [])]);
+    html += leftPanel(v, champ, span, side);
+    if (v.settings.showHint) html += rightPanel(champ, chosen, span, side, v.settings.panelOffsets.right);
   }
   if (pick) {
     const vds = verdicts(v);
