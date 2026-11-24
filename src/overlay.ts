@@ -71,16 +71,17 @@ function toggleButton(open: boolean, offset: [number, number] = [0, 0]): string 
     + `<path d="${arrow}" fill="none" stroke="#C8AA6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
 }
 
-/** The two side panels' shared frame: one width, one scale (so their text is the same size), one height and one top,
- * the scale the one with less room needs. Each keeps its own drag offset. */
+/** The two side panels' shared scale: one width and one scale (so their text is the same size), the scale the side
+ * with less room needs. Each panel is as tall as its content and centred on the screen's height; each keeps its own
+ * drag offset. */
 const SIDE_W = 360;
-interface Side { k: number; fit: string; Y: number; H: number }
-function sideFrame(span: Span, size: number, heights: number[]): Side {
-  const room = Math.min(span.left - 28, 1920 - 12 - span.right - 16);
-  const [k, fit] = fitIn(room, SIDE_W, size);
-  const H = Math.max(...heights);
-  return { k, fit, H, Y: Math.max(120, Math.round((span.top + span.bottom) / 2 - H * k / 2)) };
+interface Side { k: number; fit: string }
+function sideFrame(span: Span, size: number): Side {
+  const [k, fit] = fitIn(Math.min(span.left - 28, 1920 - 12 - span.right - 16), SIDE_W, size);
+  return { k, fit };
 }
+/** The top of a panel h tall at scale k, centred on the screen's height. */
+const midY = (h: number, k: number) => Math.max(12, Math.round(540 - h * k / 2));
 
 /** The panel's title row: drag it to move the panel, double-click it to put the panel back beside the cards. */
 const dragHandle = (key: "left" | "right", w: number) =>
@@ -100,9 +101,9 @@ function leftPanel(v: View, champ: ChampionData, span: Span, side: Side): string
   const W = SIDE_W, { P, TH, GAP } = LEFT, inner = W - 2 * P, half = Math.floor((inner - GAP) / 2);
   const tileRows = Math.ceil(styles.length / 2), tilesH = tileRows * TH + (tileRows - 1) * GAP;
   const autoY = 68 + tilesH + 12, modeY = autoY + 20 + 16;
-  const { k, fit, H } = side, X = Math.round(span.left - 16 - W * k);
+  const { k, fit } = side, H = leftHeight(champ), X = Math.round(span.left - 16 - W * k);
   const [dx, dy] = v.settings.panelOffsets.left ?? [0, 0];
-  const Y = side.Y + dy;
+  const Y = midY(H, k) + dy;
   let s = box(X + dx, Y, W, H, "plate", "", fit + ";" + motion("left", "fade", FADE)) + plate(W, H) + dragHandle("left", W - P - 36 - 8)
     + `<div class="abs panel-title" style="left:${P}px">玩法</div>`
     + `<button class="abs gear" style="left:${W - P - 36}px;top:16px" data-act="open-settings" data-hit aria-label="建議邏輯">${plate(36, 36)}${gear(22)}</button>`;
@@ -145,9 +146,9 @@ function rightHeight(champ: ChampionData, style: StyleData | null): number {
   return 78 + (champ.play.length ? 30 + playH + 28 : 0) + (path.length ? 30 + pathH + 20 : 0) + 22 + 22;
 }
 function rightPanel(champ: ChampionData, style: StyleData | null, span: Span, side: Side, offset: [number, number] = [0, 0]): string {
-  const W = SIDE_W, P = 24, { fit, H } = side, X = span.right + 16;
+  const W = SIDE_W, P = 24, { k, fit } = side, H = rightHeight(champ, style), X = span.right + 16;
   const path = pathRows(style);
-  const Y = side.Y + offset[1];
+  const Y = midY(H, k) + offset[1];
   let s = box(X + offset[0], Y, W, H, "plate", "", fit + ";" + motion("right", "fade", FADE)) + plate(W, H) + dragHandle("right", W) + `<div class="abs panel-title" style="left:${P}px">${esc(champ.name)}</div>`;
   let y = 78;
   if (champ.play.length) {
@@ -274,7 +275,7 @@ export function render(root: HTMLElement, v: View): void {
   // the panels: in champ select; in game at each pick, in the shop, or when the toggle opened them
   if (champ && ready && open) {
     const chosen = styleOf(v.data, st.champion, v.settings.styleKey);
-    const side = sideFrame(span, v.settings.panelScale, [leftHeight(champ), ...(v.settings.showHint ? [rightHeight(champ, chosen)] : [])]);
+    const side = sideFrame(span, v.settings.panelScale);
     html += leftPanel(v, champ, span, side);
     if (v.settings.showHint) html += rightPanel(champ, chosen, span, side, v.settings.panelOffsets.right);
   }
