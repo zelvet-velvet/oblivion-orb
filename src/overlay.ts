@@ -16,9 +16,10 @@ export interface UiState {
   panels?: "open" | "closed" | null;
 }
 
-/** In game, whether the side panels show: the player's choice, else open while a pick or the shop is open. */
-export function panelsOpen(st: GameState, ui: UiState): boolean {
-  if (st.phase === "champ-select") return true;
+/** Whether the side panels show: in champ select by the 選角時顯示 setting; in game the player's choice, else open
+ * while a pick or the shop is open. */
+export function panelsOpen(st: GameState, ui: UiState, champSelect = false): boolean {
+  if (st.phase === "champ-select") return champSelect;
   if (st.phase !== "in-game" && st.phase !== "augment-pick") return false;
   return ui.panels ? ui.panels === "open" : autoOpen(st);
 }
@@ -221,7 +222,7 @@ function settingsPanel(s: Settings): string {
   const rows: [string, keyof Settings | null, "toggle" | "size" | "choice" | null][] = [
     ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
     ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["建議標示", "marks", "choice"], ["可考慮的卡", "friends", "choice"],
-    ["直播、截圖看得到", "streaming", "toggle"],
+    ["選角時顯示兩側面板", "champSelect", "toggle"], ["直播、截圖看得到", "streaming", "toggle"],
     ["商店", null, null], ["選角時把出裝寫進商店的物品組合", "itemSets", "toggle"]];
   let y = 96, body = "";
   for (const [label, key, kind] of rows) {
@@ -266,7 +267,7 @@ export function render(root: HTMLElement, v: View): void {
   const span = cardSpan(pick ? st.offers : []);
   let html = "";
   const inGame = st.phase === "in-game" || st.phase === "augment-pick";
-  const open = panelsOpen(st, v.ui);
+  const open = panelsOpen(st, v.ui, v.settings.champSelect);
   // the champion's icons load first (from champ select on); until they are in, nothing of the champion shows, so the
   // panels never appear empty and fill in icon by icon
   const ready = !champ || loaded([...champ.play.map((r) => r.icon),

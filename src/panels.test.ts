@@ -15,8 +15,9 @@ describe("panelsOpen", () => {
     expect(panelsOpen(base, { settingsOpen: false, panels: "open" })).toBe(true);
     expect(panelsOpen({ ...base, phase: "augment-pick", offers: [card] }, { settingsOpen: false, panels: "closed" })).toBe(false);
   });
-  it("always open in champ select, never outside a game", () => {
-    expect(panelsOpen({ ...base, phase: "champ-select" }, { settingsOpen: false, panels: "closed" })).toBe(true);
+  it("in champ select by the setting (off by default), never outside a game", () => {
+    expect(panelsOpen({ ...base, phase: "champ-select" }, { settingsOpen: false, panels: "closed" }, true)).toBe(true);
+    expect(panelsOpen({ ...base, phase: "champ-select" }, { settingsOpen: false, panels: "open" })).toBe(false);
     expect(panelsOpen({ ...base, phase: "idle" }, { settingsOpen: false, panels: "open" })).toBe(false);
   });
 });

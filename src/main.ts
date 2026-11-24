@@ -146,7 +146,7 @@ addEventListener("pointerup", (e) => {
   // the toggle orb: a click (it barely moved) opens or closes the panels; a drag only moves it
   if (drag.key === "toggle" && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 5) {
     settings = { ...settings, panelOffsets: { ...settings.panelOffsets, toggle: drag.from } };
-    ui.panels = panelsOpen(state, ui) ? "closed" : "open";
+    ui.panels = panelsOpen(state, ui, settings.champSelect) ? "closed" : "open";
   }
   drag = null; saveSettings(); draw();
 });
