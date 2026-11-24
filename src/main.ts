@@ -28,6 +28,12 @@ function loadSettings(): Settings {
 function saveSettings() { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch { /* private mode: settings last the session */ } }
 
 let settings = loadSettings();
+
+/** 直播、截圖看得到, to Rust: whether the overlay shows in screen captures (and the reader copies the game's window). */
+async function sendStreaming() {
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("set_streaming", { on: settings.streaming });
+}
 const ui: UiState = { settingsOpen: false };
 let state: GameState = { phase: "idle", champion: null, round: null, offers: [], shift: false, hover: null };
 let scale = 1, offX = 0, offY = 0;
@@ -94,7 +100,10 @@ function act(a: Action) {
     case "mode": settings = { ...settings, mode: a.mode }; break;
     case "open-settings": ui.settingsOpen = true; state = { ...state, hover: null }; break;
     case "close-settings": ui.settingsOpen = false; break;
-    case "setting": settings = { ...settings, [a.key]: a.value }; break;
+    case "setting":
+      settings = { ...settings, [a.key]: a.value };
+      if (a.key === "streaming" && inApp) void sendStreaming();
+      break;
   }
   saveSettings(); draw();
 }
@@ -169,6 +178,7 @@ const overOurs = (x: number, y: number) => ui.settingsOpen || !!document.element
 const toFrame = (r: Rect): Rect => ({ x: (r.x - offX) / scale, y: (r.y - offY) / scale, w: r.w / scale, h: r.h / scale });
 
 if (inApp) {
+  void sendStreaming();
   void (async () => {
     const { listen } = await import("@tauri-apps/api/event");
     await listen<Reading>("game-reading", ({ payload: r }) => {

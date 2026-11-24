@@ -4,6 +4,7 @@
 
 mod diag;
 mod game;
+mod grab;
 mod pointer;
 mod reader;
 
@@ -32,7 +33,8 @@ pub fn run() {
     tauri::Builder::default()
         .manage(pointer::HitRegions::default())
         .manage(reader::Unread::default())
-        .invoke_handler(tauri::generate_handler![pointer::set_hit_regions, reader::set_unread, page_log, write_item_sets])
+        .manage(grab::Streaming::default())
+        .invoke_handler(tauri::generate_handler![pointer::set_hit_regions, reader::set_unread, grab::set_streaming, page_log, write_item_sets])
         .setup(|app| {
             let win = app.get_webview_window("main").expect("the main window");
             // cover the primary screen (the game, borderless); clicks pass through until the cursor is over a control
@@ -70,11 +72,13 @@ pub fn run() {
             }
             tray.build(app)?;
 
-            reader::exclude_from_capture(app.handle(), &diag);
+            // kept out of captures until the page says 直播顯示 is on
+            grab::set_affinity(app.handle(), false, diag.clone());
+            let streaming = app.state::<grab::Streaming>().0.clone();
             let in_game = Arc::new(std::sync::atomic::AtomicBool::new(false));
             pointer::spawn(app.handle().clone());
             game::spawn(app.handle().clone(), in_game.clone(), diag.clone());
-            reader::spawn(app.handle().clone(), in_game, diag);
+            reader::spawn(app.handle().clone(), in_game, streaming, diag);
             Ok(())
         })
         .run(tauri::generate_context!())

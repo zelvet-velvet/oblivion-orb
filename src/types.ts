@@ -40,6 +40,7 @@ export interface Settings {
   /** when the pick's marks (the best card's frame, the verdict plates, the reroll tags) show, all together: always; not
    * while the cursor is on any card (the game's tooltip opens there); or only while Shift is held */
   marks: Marks;
+  streaming: boolean;         // 直播、截圖看得到: the overlay shows in OBS, Discord and screenshots (the reader then copies the game's window)
   itemSets: boolean;          // write the champion's builds into the client as item sets (the shop's recommended tab)
   panelScale: number;         // the side panels' size (1: as drawn; they still shrink to fit beside four cards at 1)
   /** where the player dragged the side panels: [dx, dy] from their place beside the cards, in 1920 × 1080 pixels */
@@ -48,7 +49,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   styleKey: null, mode: "均衡", useTiers: true, useSynergy: true,
-  showHint: true, friends: true, marks: "hover-hide", itemSets: true, panelScale: 1, panelOffsets: {},
+  showHint: true, friends: true, marks: "hover-hide", itemSets: true, streaming: false, panelScale: 1, panelOffsets: {},
 };
 
 // ---- the data built by tools/build_data.py from Morellonomicon ----

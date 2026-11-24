@@ -203,6 +203,7 @@ function settingsPanel(s: Settings): string {
   const rows: [string, keyof Settings | null, "toggle" | "size" | "choice" | null][] = [
     ["排序依據", null, null], ["英雄的強化分級", "useTiers", "toggle"], ["和已拿強化搭配", "useSynergy", "toggle"],
     ["顯示", null, null], ["面板大小", "panelScale", "size"], ["怎麼玩、出裝", "showHint", "toggle"], ["建議標示", "marks", "choice"], ["可考慮的卡", "friends", "choice"],
+    ["直播、截圖看得到", "streaming", "toggle"],
     ["商店", null, null], ["選角時把出裝寫進商店的物品組合", "itemSets", "toggle"]];
   let y = 96, body = "";
   for (const [label, key, kind] of rows) {

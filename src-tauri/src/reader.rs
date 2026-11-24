@@ -1,8 +1,8 @@
 // The card reader: while a game is on, a few times a second it copies only the area of the three augment cards from
-// the screen (GDI), tells whether the pick is open from the cards' frame edges, reads each card's name with Windows' own
-// OCR when a card is new or changed, and whether its reroll button is still usable from the button's colour. It sends
-// "pick" to the page: the names and where each card and button sits. No game memory; our own window is excluded from
-// the capture, so the overlay never reads itself.
+// the screen (or, with 直播顯示 on, from the game's own window: grab.rs), tells whether the pick is open from the cards'
+// frame edges, reads each card's name with Windows' own OCR when a card is new or changed, and whether its reroll button is still usable from the button's colour. It sends
+// "pick" to the page: the names and where each card and button sits. No game memory; the overlay is never in what the
+// reader copies (kept out of the screen's captures, or left out of the game window's copy).
 //
 // Positions follow the game's pick screen at 1920 × 1080 (measured on real screenshots), scaled by the screen's height
 // and centred, which is how the game lays out its UI. A pick offers three cards, or four (Jhin's band, for one): the
@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::diag::Diag;
+use crate::grab::Grabber;
 
 #[derive(Serialize, Clone, Copy, PartialEq, Debug)]
 pub struct Rect {
@@ -123,38 +124,9 @@ impl Shot {
     }
 }
 
-#[cfg(windows)]
-fn capture(x: i32, y: i32, w: i32, h: i32) -> Option<Shot> {
-    use windows_sys::Win32::Graphics::Gdi::*;
-    unsafe {
-        let screen = GetDC(std::ptr::null_mut());
-        if screen.is_null() {
-            return None;
-        }
-        let mem = CreateCompatibleDC(screen);
-        let bmp = CreateCompatibleBitmap(screen, w, h);
-        let old = SelectObject(mem, bmp as _);
-        let ok = BitBlt(mem, 0, 0, w, h, screen, x, y, SRCCOPY) != 0;
-        let mut info: BITMAPINFO = std::mem::zeroed();
-        info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
-        info.bmiHeader.biWidth = w;
-        info.bmiHeader.biHeight = -h; // top-down
-        info.bmiHeader.biPlanes = 1;
-        info.bmiHeader.biBitCount = 32;
-        info.bmiHeader.biCompression = BI_RGB;
-        let mut px = vec![0u8; (w * h * 4) as usize];
-        let lines = GetDIBits(mem, bmp, 0, h as u32, px.as_mut_ptr() as _, &mut info, DIB_RGB_COLORS);
-        SelectObject(mem, old);
-        DeleteObject(bmp as _);
-        DeleteDC(mem);
-        ReleaseDC(std::ptr::null_mut(), screen);
-        (ok && lines == h).then_some(Shot { x, y, w, h, px })
-    }
-}
-
-#[cfg(not(windows))]
-fn capture(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Shot> {
-    None
+/// A copy of part of the screen (the screen itself, or the game's window with 直播顯示 on: see grab.rs).
+fn capture(g: &mut Grabber, x: i32, y: i32, w: i32, h: i32) -> Option<Shot> {
+    g.pixels(x, y, w, h).map(|px| Shot { x, y, w, h, px })
 }
 
 /// Windows' OCR in Traditional Chinese, if the language is installed.
@@ -276,9 +248,9 @@ fn dark((r, g, b): (f32, f32, f32)) -> bool {
 /// Whether the shop is still (or again) at `r`, a rect find_shop gave: two one-pixel rows, its gold top edge and its dark
 /// gold bottom edge. Cheap enough to ask every 50 ms, so the panels follow the shop open and shut at once; the whole
 /// screen is searched only when the shop is not where it was.
-fn shop_at(r: Rect) -> bool {
+fn shop_at(g: &mut Grabber, r: Rect) -> bool {
     let (x, w) = (r.x as i32, r.w as i32);
-    let (Some(top), Some(bottom)) = (capture(x, r.y as i32, w, 1), capture(x, (r.y + r.h) as i32 - 2, w, 1)) else { return false };
+    let (Some(top), Some(bottom)) = (capture(g, x, r.y as i32, w, 1), capture(g, x, (r.y + r.h) as i32 - 2, w, 1)) else { return false };
     let xs: Vec<i32> = (0..w).step_by(4).collect();
     let gold_share = xs.iter().filter(|&&dx| gold(top.at(x + dx, top.y))).count() as f32 / xs.len().max(1) as f32;
     let dark_hits = (0..10).filter(|i| dark(bottom.at(x + w * (2 * i + 1) / 20, bottom.y))).count();
@@ -316,20 +288,6 @@ fn raise(app: &AppHandle) {
     let _ = app;
 }
 
-/// Keep our own window out of screen captures (Windows 10 2004 and later), so the reader never sees the overlay.
-pub fn exclude_from_capture(app: &AppHandle, diag: &Diag) {
-    #[cfg(windows)]
-    if let Some(win) = app.get_webview_window("main") {
-        if let Ok(h) = win.hwnd() {
-            use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE};
-            let ok = unsafe { SetWindowDisplayAffinity(h.0 as _, WDA_EXCLUDEFROMCAPTURE) } != 0;
-            diag.log(if ok { "overlay kept out of the capture" } else { "could not keep the overlay out of the capture (Windows older than 10 2004?)" });
-        }
-    }
-    #[cfg(not(windows))]
-    let _ = (app, diag);
-}
-
 /// The cards of the open pick the page could not match to an augment (or a shard), by index: the reader reads those
 /// again, another way each time (Shot::name_image), until the page matches them.
 #[derive(Default)]
@@ -359,9 +317,10 @@ impl Slot {
     }
 }
 
-pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
+pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, streaming: Arc<AtomicBool>, diag: Arc<Diag>) {
     thread::spawn(move || {
         let ocr = Ocr::new();
+        let mut grab = Grabber::new(streaming, diag.clone());
         diag.log(if ocr.is_some() {
             "ocr: Traditional Chinese ready"
         } else {
@@ -415,11 +374,11 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
             // last seen; the whole screen when it is not there, at once when it just left (dragged, or shut) and every
             // 200 ms while it is shut (opened somewhere new)
             if open.is_none() {
-                let mut found = shop_last.filter(|&r| shop_at(r));
+                let mut found = shop_last.filter(|&r| shop_at(&mut grab, r));
                 let mut looked = shop_last.is_some();
                 if found.is_none() && (shop.is_some() || shop_look.elapsed() >= Duration::from_millis(200)) {
                     shop_look = Instant::now();
-                    found = capture(mx as i32, my as i32, sw as i32, sh as i32).and_then(|s| find_shop(&s, k));
+                    found = capture(&mut grab, mx as i32, my as i32, sw as i32, sh as i32).and_then(|s| find_shop(&s, k));
                     looked = true;
                 }
                 if looked {
@@ -449,7 +408,7 @@ pub fn spawn(app: AppHandle, in_game: Arc<AtomicBool>, diag: Arc<Diag>) {
             let widest = card_xs(LAYOUTS[0]);
             let (x0, y0) = (px(widest[0]), py(CARD_Y));
             let (x1, y1) = (px(widest[widest.len() - 1] + CARD_W), py(REROLL_Y + REROLL_H + 4.0));
-            let Some(shot) = capture(x0, y0, x1 - x0, y1 - y0) else {
+            let Some(shot) = capture(&mut grab, x0, y0, x1 - x0, y1 - y0) else {
                 if last_look.elapsed() > Duration::from_secs(10) {
                     last_look = Instant::now();
                     diag.log("screen capture failed");
