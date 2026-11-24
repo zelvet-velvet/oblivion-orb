@@ -97,9 +97,9 @@ impl Grabber {
                         }
                     }
                 }
-                if let Some(c) = &mut self.wgc {
+                if self.wgc.is_some() {
                     self.note("the game's window");
-                    return c.pixels(x, y, w, h);
+                    return self.wgc.as_mut().and_then(|c| c.pixels(x, y, w, h));
                 }
                 self.note("the screen (直播顯示 on but no game window to copy: the overlay may be in the way)");
             } else {
