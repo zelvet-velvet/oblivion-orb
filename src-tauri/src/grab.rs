@@ -192,7 +192,11 @@ mod wgc {
                     let _ = windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED);
                 }
                 match GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless).and_then(|op| op.join()) {
-                    Ok(s) => diag.log(&format!("capture without the yellow frame: access {} (0 allowed)", s.0)),
+                    Ok(s) => diag.log(&format!("capture without the yellow frame: {}", match s.0 {
+                        4 => "allowed".to_string(),
+                        2 => "denied by the player (Windows Settings > Privacy > Screen capture)".to_string(),
+                        n => format!("not allowed ({n})"),
+                    })),
                     Err(e) => diag.log(&format!("capture without the yellow frame: not asked ({e})")),
                 }
             });
